@@ -1,0 +1,1835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>REFX — Audio referencing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --a:#22e6c8; --b:#ff7a2f; --bg:#050507; --panel:#0e0f14; --panel2:#151720; --line:#23262f; --line2:#2e3240;
+  --text:#f2f3f7; --muted:#8a8fa3; --hi:#ff4d5e; --mid:#ffc542; --ok:#4fe08a; --info:#7c8cff;
+  --display:'Syne','Arial Black',system-ui,sans-serif; --sans:'Space Grotesk',system-ui,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+body{min-height:100vh;background:
+  radial-gradient(900px 520px at 0% 0%,rgba(34,230,200,.10),transparent 60%),
+  radial-gradient(900px 520px at 100% 0%,rgba(255,122,47,.10),transparent 60%),var(--bg)}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.35;
+  background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);background-size:40px 40px;
+  -webkit-mask-image:linear-gradient(#000,transparent 70%);mask-image:linear-gradient(#000,transparent 70%)}
+.wrap{position:relative;max-width:1180px;margin:0 auto;padding:0 18px 70px}
+
+/* ---------- HERO / LOGO */
+.hero{position:relative;padding:44px 0 30px;overflow:hidden}
+#bg{position:absolute;inset:0;width:100%;height:100%;opacity:.55;pointer-events:none}
+.hero-in{position:relative}
+.topline{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+.chip{font:600 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;padding:6px 10px;border:1px solid var(--line2);border-radius:999px;color:var(--muted);background:rgba(10,11,15,.6);backdrop-filter:blur(6px)}
+.chip.ok{color:var(--ok)}
+.wm{font-family:var(--display);font-weight:800;font-size:clamp(80px,21vw,168px);line-height:.82;letter-spacing:-.045em;margin:0;display:flex;align-items:center;white-space:nowrap;
+  text-shadow:0 0 60px rgba(255,255,255,.06)}
+.wm .mark{width:.84em;height:.84em;margin:0 -.015em 0 .005em;flex:none;filter:drop-shadow(0 0 22px rgba(34,230,200,.25)) drop-shadow(0 0 22px rgba(255,122,47,.2))}
+.wm .mark.x{width:.74em;height:.71em;margin:0 0 0 -.015em;align-self:center;transform:translateY(-.005em)}
+.mark .pulse{transform-box:fill-box;transform-origin:center;animation:pulse 1.6s ease-in-out infinite}
+body.busy .mark .pulse{animation-duration:.4s}
+@keyframes pulse{0%,100%{transform:scale(.7);opacity:.75}50%{transform:scale(1.15);opacity:1}}
+.wm .last{background:linear-gradient(180deg,#fff 30%,#ffb38a);-webkit-background-clip:text;background-clip:text;color:transparent}
+.mark .bar{transform-box:fill-box;transform-origin:center;animation:bounce 1.6s ease-in-out infinite}
+body.busy .mark .bar{animation-duration:.42s}
+@keyframes bounce{0%,100%{transform:scaleY(.45)}50%{transform:scaleY(1)}}
+.mark .spin{transform-origin:50px 50px;animation:spin 18s linear infinite}
+body.busy .mark .spin{animation-duration:2.5s}
+@keyframes spin{to{transform:rotate(360deg)}}
+.tagline{font-size:clamp(17px,2.2vw,22px);line-height:1.45;max-width:680px;margin:20px 0 10px;color:#cfd2de}
+.tagline b{color:#fff;font-weight:600}
+.by{font:12px var(--mono);color:var(--muted);letter-spacing:.06em}
+.by b{color:var(--text);font-weight:600}
+
+/* ---------- DECKS (upload) */
+.decks{display:grid;grid-template-columns:1fr 64px 1fr;align-items:stretch;gap:0;margin-top:8px}
+.slot{position:relative;display:flex;flex-direction:column;cursor:pointer;border-radius:22px;padding:22px;min-height:230px;overflow:hidden;isolation:isolate;
+  background:linear-gradient(160deg,#12141b,#0b0c10);border:1px solid var(--line);transition:.18s transform,.18s border-color,.18s box-shadow}
+.slot input{position:absolute;inset:0;opacity:0;cursor:pointer;z-index:3}
+.slot .big{position:absolute;right:-6px;bottom:-34px;font:800 220px/1 var(--display);letter-spacing:-.06em;color:transparent;-webkit-text-stroke:1.5px var(--line2);z-index:-1;transition:.25s}
+.slot[data-k=ref]{--c:var(--a)} .slot[data-k=mine]{--c:var(--b)}
+.slot:hover{border-color:var(--line2);transform:translateY(-2px)}
+.slot.over,.slot.has{border-color:var(--c);box-shadow:0 0 0 1px var(--c),0 20px 60px -20px var(--c)}
+.slot.has .big,.slot.over .big{-webkit-text-stroke-color:var(--c);opacity:.5}
+.lab{font:700 11px var(--mono);letter-spacing:.16em;color:var(--c)}
+.slot .t{font:700 26px/1.1 var(--display);margin:12px 0 6px;max-width:80%}
+.slot .s{color:var(--muted);font-size:14px;max-width:78%;line-height:1.45}
+.slot .file{margin-top:auto;padding-top:16px;font:12px var(--mono);color:var(--muted);display:flex;gap:8px;align-items:center;max-width:85%}
+.slot .file .dot{width:8px;height:8px;border-radius:50%;background:var(--line2);flex:none}
+.slot.has .file{color:var(--text)} .slot.has .file .dot{background:var(--c);box-shadow:0 0 10px var(--c)}
+.slot .file span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.slot canvas.mini{height:46px;margin-top:12px;opacity:0;transition:.3s}
+.slot.ready canvas.mini{opacity:1}
+.vs{display:grid;place-items:center;font:800 22px var(--display);color:var(--muted);position:relative}
+.vs span{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;background:#0b0c10;border:1px solid var(--line2);z-index:1}
+.vs::before{content:"";position:absolute;top:14%;bottom:14%;left:50%;width:1px;background:linear-gradient(transparent,var(--line2),transparent)}
+
+.cta{display:flex;align-items:center;gap:18px;margin:22px 0 6px;flex-wrap:wrap}
+.go{position:relative;appearance:none;border:0;cursor:pointer;border-radius:16px;padding:18px 30px;font:800 17px var(--display);letter-spacing:.04em;text-transform:uppercase;color:#060608;
+  background:linear-gradient(90deg,var(--a),#b8f0e4 48%,#ffd2b8 52%,var(--b));box-shadow:0 14px 40px -12px rgba(34,230,200,.5),0 14px 40px -12px rgba(255,122,47,.45);transition:.15s}
+.go:disabled{filter:grayscale(1) brightness(.45);box-shadow:none;cursor:not-allowed}
+.go:not(:disabled):hover{transform:translateY(-1px)}
+.prog{flex:1;min-width:240px;display:none}
+.prog.on{display:block}
+.prog .track{height:8px;border-radius:99px;background:#14161d;overflow:hidden;border:1px solid var(--line)}
+.prog i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--a),var(--b));transition:width .15s;box-shadow:0 0 16px var(--a)}
+.prog span{display:block;font:12px var(--mono);color:var(--muted);margin-top:8px;letter-spacing:.04em}
+.err{color:var(--hi);font-size:14px;margin-top:8px}
+.how{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:22px}
+.how div{border:1px solid var(--line);border-radius:14px;padding:14px;background:rgba(14,15,20,.6);font-size:13px;color:var(--muted);line-height:1.45}
+.how b{display:block;font:700 15px var(--display);color:var(--text);margin-bottom:4px}
+
+/* ---------- RESULTS */
+#results{display:none;margin-top:40px}
+#results.on{display:block}
+.sec-h{display:flex;align-items:baseline;gap:14px;margin:38px 0 14px;flex-wrap:wrap}
+.sec-h .num{font:700 12px var(--mono);color:var(--muted);letter-spacing:.12em;border:1px solid var(--line2);padding:4px 8px;border-radius:8px}
+.sec-h h2{font:800 30px/1 var(--display);margin:0;letter-spacing:-.01em}
+.sec-h p{margin:0;color:var(--muted);font-size:14px;flex-basis:100%;padding-left:0}
+.panel{background:linear-gradient(180deg,#111319,#0b0c10);border:1px solid var(--line);border-radius:22px;padding:22px;box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+
+/* face-off */
+.faceoff{display:grid;grid-template-columns:1fr 280px 1fr;gap:10px;align-items:center;position:relative;overflow:hidden}
+.faceoff::before,.faceoff::after{content:"";position:absolute;top:-40%;bottom:-40%;width:45%;pointer-events:none}
+.faceoff::before{left:-10%;background:radial-gradient(closest-side,rgba(34,230,200,.12),transparent)}
+.faceoff::after{right:-10%;background:radial-gradient(closest-side,rgba(255,122,47,.12),transparent)}
+.side{position:relative;z-index:1}
+.side.b{text-align:right}
+.side .lab{color:var(--c)} .side.a{--c:var(--a)} .side.b{--c:var(--b)}
+.side .nm{font-size:14px;color:var(--muted);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lufs{font:800 clamp(52px,7vw,84px)/1 var(--display);letter-spacing:-.04em;margin:12px 0 4px;color:var(--c);text-shadow:0 0 40px color-mix(in srgb,var(--c) 35%,transparent)}
+.lufs small{font:600 14px var(--mono);letter-spacing:.1em;color:var(--muted);margin-left:8px}
+.side.b .lufs small{margin-left:8px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+.side.b .chips{justify-content:flex-end}
+.chips span{font:12px var(--mono);padding:5px 9px;border-radius:8px;background:#161821;border:1px solid var(--line);color:#c9ccd8}
+.chips span b{color:var(--text);font-weight:600}
+.gauge{position:relative;z-index:1;text-align:center}
+.gauge svg{width:100%;max-width:260px;height:auto;display:block;margin:0 auto}
+.gauge .gv{position:absolute;left:0;right:0;top:34%;font:800 64px/1 var(--display);letter-spacing:-.04em}
+.gauge .gv small{display:block;font:600 11px var(--mono);letter-spacing:.14em;color:var(--muted);margin-top:6px}
+.gauge .gl{font:700 15px var(--display);margin-top:-18px}
+.delta{display:inline-block;margin-top:10px;font:600 12px var(--mono);padding:6px 10px;border-radius:99px;border:1px solid var(--line2);color:var(--muted)}
+
+/* deck */
+.deck{padding:0;overflow:hidden}
+.screen{position:relative;background:#07080b;border-bottom:1px solid var(--line)}
+#cWave{height:130px;cursor:pointer}
+.live{display:grid;grid-template-columns:1fr 54px;border-top:1px solid #15171e}
+#cLive{height:170px}
+#cMeter{height:170px;border-left:1px solid #15171e}
+.scr-lab{position:absolute;font:700 10px var(--mono);letter-spacing:.14em;color:var(--muted);pointer-events:none}
+.controls{display:flex;align-items:center;gap:16px;padding:16px 20px;flex-wrap:wrap}
+.play{width:62px;height:62px;border-radius:50%;border:0;cursor:pointer;display:grid;place-items:center;flex:none;color:#060608;background:#f2f3f7;box-shadow:0 0 0 6px #15171e,0 10px 30px -8px rgba(255,255,255,.3)}
+.abswitch{display:flex;background:#0a0b0f;border:1px solid var(--line2);border-radius:16px;padding:4px;gap:4px;flex:1;min-width:260px}
+.abswitch button{flex:1;display:flex;align-items:center;gap:10px;border:0;border-radius:12px;padding:8px 12px;cursor:pointer;background:transparent;color:var(--muted);text-align:left;min-width:0;transition:.15s}
+.abswitch button b{font:800 26px/1 var(--display);width:30px;flex:none}
+.abswitch button span{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.abswitch button.on[data-w=ref]{background:rgba(34,230,200,.13);color:var(--text);box-shadow:inset 0 0 0 1px var(--a)}
+.abswitch button.on[data-w=ref] b{color:var(--a)}
+.abswitch button.on[data-w=mine]{background:rgba(255,122,47,.13);color:var(--text);box-shadow:inset 0 0 0 1px var(--b)}
+.abswitch button.on[data-w=mine] b{color:var(--b)}
+.time{font:600 14px var(--mono);color:var(--text);min-width:110px;text-align:center}
+.time small{color:var(--muted);font-weight:400}
+.toggles{display:flex;gap:10px;flex-wrap:wrap;padding:0 20px 18px}
+.sw{display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;font-size:13px;color:#c9ccd8;border:1px solid var(--line);border-radius:12px;padding:9px 12px;background:#0d0e13}
+.sw input{display:none}
+.sw i{width:34px;height:20px;border-radius:99px;background:#262a36;position:relative;transition:.15s;flex:none}
+.sw i::after{content:"";position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:#8a8fa3;transition:.15s}
+.sw input:checked+i{background:rgba(34,230,200,.35)}
+.sw input:checked+i::after{left:17px;background:var(--a)}
+.sw.eq input:checked+i{background:rgba(255,122,47,.35)}
+.sw.eq input:checked+i::after{background:var(--b)}
+.sw input:disabled+i{opacity:.3}
+.kbd{font:11px var(--mono);color:var(--muted);margin-left:auto;align-self:center}
+
+/* recs */
+.recs{display:grid;gap:10px}
+.rec{position:relative;display:grid;grid-template-columns:54px 1fr;gap:6px 14px;padding:16px 18px;border-radius:16px;background:linear-gradient(90deg,color-mix(in srgb,var(--lc) 9%,#101218),#0d0e13 45%);border:1px solid var(--line);overflow:hidden}
+.rec::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--lc);box-shadow:0 0 18px var(--lc)}
+.rec.high{--lc:var(--hi)} .rec.mid{--lc:var(--mid)} .rec.ok{--lc:var(--ok)} .rec.info{--lc:var(--info)}
+.rec .n{font:800 30px/1 var(--display);color:var(--lc);opacity:.9;grid-row:span 2}
+.rec .hd{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.rec .pill{font:700 10px var(--mono);letter-spacing:.12em;padding:4px 8px;border-radius:6px;color:var(--lc);background:color-mix(in srgb,var(--lc) 14%,transparent)}
+.rec h4{margin:0;font:700 17px var(--display);letter-spacing:-.005em}
+.rec p{margin:0;color:#bfc3d1;font-size:14px;line-height:1.55}
+.leg{display:flex;gap:14px;flex-wrap:wrap;font:11px var(--mono);color:var(--muted);margin-bottom:12px;letter-spacing:.06em}
+.leg i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle}
+
+/* tonal faders */
+.faders{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:22px}
+.fader{text-align:center;min-width:0}
+.ftrack{position:relative;height:200px;border-radius:14px;background:linear-gradient(180deg,#0a0b0f,#101219);border:1px solid var(--line);overflow:hidden}
+.ftrack .tgt{position:absolute;left:0;right:0;background:rgba(34,230,200,.14);border-top:1px solid rgba(34,230,200,.5);border-bottom:1px solid rgba(34,230,200,.5)}
+.ftrack .ctr{position:absolute;left:10%;right:10%;height:2px;top:50%;margin-top:-1px;background:var(--a);box-shadow:0 0 10px var(--a)}
+.ftrack .tick{position:absolute;left:0;width:8px;height:1px;background:#2a2e3a}
+.ftrack .fill{position:absolute;left:50%;width:6px;margin-left:-3px;border-radius:3px;background:var(--fc);opacity:.55}
+.ftrack .knob{position:absolute;left:12%;right:12%;height:22px;margin-top:-11px;border-radius:7px;background:var(--fc);color:#060608;font:700 11px/22px var(--mono);box-shadow:0 0 18px color-mix(in srgb,var(--fc) 60%,transparent),inset 0 1px 0 rgba(255,255,255,.5)}
+.fader .fn{font:700 14px var(--display);margin-top:8px}
+.fader .fr{font:10px var(--mono);color:var(--muted)}
+.fader .fa{font:600 11px var(--mono);margin-top:4px;min-height:14px}
+.chart-title{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;margin:6px 0 8px}
+.chart-title h3{margin:0;font:700 17px var(--display)}
+.chart-title span{font-size:12px;color:var(--muted)}
+.legend{display:flex;gap:16px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+.legend i{display:inline-block;width:18px;height:3px;border-radius:2px;vertical-align:middle;margin-right:6px}
+canvas{display:block;width:100%;touch-action:none}
+#cSpec{height:270px} #cDiff{height:190px} #cEq{height:220px} #cTime{height:200px}
+.readout{font:12px var(--mono);color:var(--muted);min-height:18px;margin:8px 0 14px}
+.note{font-size:12px;color:var(--muted);line-height:1.5;margin-top:12px}
+
+/* eq modules */
+.bands{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:16px}
+.band{border:1px solid var(--line);border-radius:16px;padding:14px 12px;background:#0c0d12;text-align:center;position:relative}
+.band .bn{position:absolute;top:10px;left:12px;font:700 11px var(--mono);color:var(--muted)}
+.band .bz{font:700 13px var(--display);margin-bottom:6px}
+.band svg{width:74px;height:74px;display:block;margin:0 auto}
+.band .bg{font:800 20px var(--display);margin-top:2px}
+.band .bd{font:11px var(--mono);color:var(--muted);margin-top:2px}
+.empty{color:var(--muted);font-size:14px;padding:12px 0}
+.btn{appearance:none;cursor:pointer;border:1px solid var(--line2);background:#101218;color:var(--text);border-radius:12px;padding:11px 16px;font:600 13px var(--sans);transition:.15s}
+.btn:hover{border-color:var(--text)}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+
+/* metric tiles */
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.tile{border:1px solid var(--line);border-radius:16px;padding:14px 14px 12px;background:linear-gradient(180deg,#111319,#0c0d12)}
+.tile .th{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}
+.tile .tl{font:600 11px var(--mono);letter-spacing:.1em;color:var(--muted);text-transform:uppercase}
+.tile .td{font:600 11px var(--mono);padding:3px 7px;border-radius:6px;background:#181a23;color:#c9ccd8}
+.tr{display:grid;grid-template-columns:16px 1fr auto;align-items:center;gap:8px;margin:6px 0}
+.tr b{font:800 13px var(--display)}
+.tr .tb{height:6px;border-radius:99px;background:#1a1d26;overflow:hidden}
+.tr .tb i{display:block;height:100%;border-radius:99px}
+.tr .tv{font:600 13px var(--mono);min-width:64px;text-align:right}
+.tr.a b,.tr.a .tv{color:var(--a)} .tr.a .tb i{background:var(--a)}
+.tr.b b,.tr.b .tv{color:var(--b)} .tr.b .tb i{background:var(--b)}
+.tile .big2{font:800 24px var(--display);margin:4px 0}
+.tile .sm{font:12px var(--mono);color:var(--muted)}
+details{margin-top:14px}
+summary{cursor:pointer;color:var(--muted);font:600 13px var(--mono);letter-spacing:.06em;padding:8px 0}
+table{width:100%;border-collapse:collapse;font-size:14px;margin-top:8px}
+th{text-align:left;font:600 11px var(--mono);letter-spacing:.1em;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:9px 10px;border-bottom:1px solid #1a1d26;font:13px var(--mono)}
+td:first-child{font-family:var(--sans);font-size:14px;color:#c3c7d6}
+td.r{color:var(--a)} td.m{color:var(--b)}
+.tblwrap{overflow-x:auto}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:var(--text);color:#060608;padding:11px 18px;border-radius:12px;font-weight:600;font-size:14px;opacity:0;transition:.2s;pointer-events:none;z-index:9}
+.toast.on{opacity:1;transform:translateX(-50%)}
+footer.mi{margin-top:60px;padding:42px 0 10px;border-top:1px solid var(--line);display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center}
+.mi-logo{width:min(260px,70vw);height:auto;display:block}
+.mi-by{font:500 13px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:#A89684}
+.mi-by b{color:#F2EDE2;font-weight:600}
+.mi-ver{font:11px var(--mono);color:var(--muted);letter-spacing:.08em;margin-top:6px}
+.mi-ver b{color:var(--text)}
+
+@media (max-width:860px){
+  .faceoff{grid-template-columns:1fr 1fr}
+  .gauge{grid-column:1/-1;order:-1}
+  .how{grid-template-columns:1fr 1fr}
+  .faders{grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+  .fader .fn{font-size:11px}
+  .fader .fr{font-size:8.5px}
+  .ftrack .knob{font-size:9px;left:4%;right:4%}
+}
+@media (max-width:640px){
+  .decks{grid-template-columns:1fr}
+  .vs{height:46px}
+  .vs::before{display:none}
+  .slot{min-height:190px}
+  .slot .big{font-size:170px}
+  .sec-h h2{font-size:24px}
+  .panel{padding:16px}
+  .lufs{font-size:44px}
+  .controls{gap:12px;padding:14px}
+  .kbd{display:none}
+  .rec{grid-template-columns:1fr}
+  .rec .n{grid-row:auto;font-size:22px}
+  .how{grid-template-columns:1fr}
+  #cSpec{height:220px} #cDiff{height:170px}
+  .ftrack{height:160px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* auto-match */
+:root{--m:#D6A85C}
+.match{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:26px;position:relative;overflow:hidden}
+.match::after{content:"";position:absolute;right:-15%;top:-30%;width:60%;height:120%;background:radial-gradient(closest-side,rgba(214,168,92,.10),transparent);pointer-events:none}
+.mctl{display:flex;flex-direction:column;gap:18px;position:relative;z-index:1}
+.ctl label{display:flex;justify-content:space-between;font:600 11px var(--mono);letter-spacing:.1em;color:var(--muted);text-transform:uppercase;margin-bottom:8px}
+.ctl label b{color:var(--m);font-size:12px}
+.ctl input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:26px;background:transparent;margin:0;cursor:pointer}
+.ctl input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:99px;background:linear-gradient(90deg,var(--m) var(--p,70%),#232633 var(--p,70%))}
+.ctl input[type=range]::-moz-range-track{height:6px;border-radius:99px;background:#232633}
+.ctl input[type=range]::-moz-range-progress{height:6px;border-radius:99px;background:var(--m)}
+.ctl input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#f2f3f7;margin-top:-8px;box-shadow:0 0 0 4px rgba(214,168,92,.35)}
+.ctl input[type=range]::-moz-range-thumb{width:22px;height:22px;border:0;border-radius:50%;background:#f2f3f7;box-shadow:0 0 0 4px rgba(214,168,92,.35)}
+.hint{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.45}
+.seg{display:flex;gap:4px;background:#0a0b0f;border:1px solid var(--line2);border-radius:12px;padding:4px;flex-wrap:wrap}
+.seg button{flex:1;border:0;background:transparent;color:var(--muted);font:600 12px var(--sans);padding:9px 10px;border-radius:9px;cursor:pointer;white-space:nowrap}
+.seg button.on{background:rgba(214,168,92,.16);color:var(--text);box-shadow:inset 0 0 0 1px var(--m)}
+.seg button span{color:var(--m);font-family:var(--mono);font-size:11px}
+.seg.small{flex:0 1 auto}
+.sw.gold input:checked+i{background:rgba(214,168,92,.35)}
+.sw.gold input:checked+i::after{background:var(--m)}
+.mrun{display:flex;flex-direction:column;gap:14px;position:relative;z-index:1}
+.gomatch{appearance:none;border:0;cursor:pointer;border-radius:18px;padding:22px 24px;text-align:left;color:#120d06;
+  background:linear-gradient(120deg,#f6dfae,#D6A85C 55%,#b9832f);box-shadow:0 18px 50px -18px rgba(214,168,92,.7),inset 0 1px 0 rgba(255,255,255,.5);transition:.15s}
+.gomatch span{display:block;font:800 30px/1 var(--display);letter-spacing:-.01em;text-transform:uppercase}
+.gomatch small{display:block;font:600 12px var(--mono);letter-spacing:.06em;margin-top:6px;opacity:.75}
+.gomatch:hover{transform:translateY(-1px)}
+.gomatch:disabled{filter:grayscale(.8) brightness(.5);cursor:wait}
+#mprog .track i{background:linear-gradient(90deg,#f6dfae,var(--m));box-shadow:0 0 16px var(--m)}
+.mres{display:flex;flex-direction:column;gap:12px}
+.bigscore{display:flex;align-items:center;gap:14px;font:800 52px/1 var(--display);letter-spacing:-.03em}
+.bigscore .from{color:var(--muted)}
+.bigscore .arrow{font-size:28px;color:var(--muted)}
+.bigscore .to{color:var(--m);text-shadow:0 0 30px rgba(214,168,92,.45)}
+.bigscore small{font:600 10px/1.4 var(--mono);letter-spacing:.12em;color:var(--muted);margin-left:6px}
+.ba{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.ba>div{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:#0c0d12;min-width:0}
+.ba .k{font:600 10px var(--mono);letter-spacing:.1em;color:var(--muted);text-transform:uppercase}
+.ba .v{font:700 15px var(--mono);margin-top:5px;white-space:nowrap}
+.ba .v .b0{color:var(--b);font-weight:400}
+.ba .v .b1{color:var(--m)}
+.ba .r{font:11px var(--mono);color:var(--a);margin-top:3px}
+.chain{font:12px/1.6 var(--mono);color:#c9ccd8;border-left:2px solid var(--m);padding-left:10px}
+.warn{color:var(--mid);font-size:13px;line-height:1.5}
+.warn:empty{display:none}
+.btn.gold{background:var(--m);color:#120d06;border-color:var(--m);font-weight:700}
+.abswitch button.on[data-w=match]{background:rgba(214,168,92,.14);color:var(--text);box-shadow:inset 0 0 0 1px var(--m)}
+.abswitch button.on[data-w=match] b{color:var(--m)}
+@media (max-width:860px){.match{grid-template-columns:1fr}}
+@media (max-width:640px){.ba{grid-template-columns:repeat(2,minmax(0,1fr))}.bigscore{font-size:40px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <canvas id="bg"></canvas>
+    <div class="hero-in">
+      <div class="topline"><span class="chip">A/B audio referencing</span><span class="chip">v0.2</span><span class="chip ok">● 100% local · nothing is uploaded</span></div>
+      <h1 class="wm" aria-label="REFX">REF<svg class="mark x" viewBox="0 0 100 100" aria-hidden="true">
+          <defs>
+            <linearGradient id="xa" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7ff5e2"/><stop offset="1" stop-color="#22e6c8"/></linearGradient>
+            <linearGradient id="xb" x1="1" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffb07a"/><stop offset="1" stop-color="#ff7a2f"/></linearGradient>
+          </defs>
+          <polygon points="4,0 30,0 96,100 70,100" fill="url(#xa)"/>
+          <polygon points="70,0 96,0 30,100 4,100" fill="url(#xb)" stroke="#050507" stroke-width="7" stroke-linejoin="miter" paint-order="stroke"/>
+          <g class="spin"><circle cx="50" cy="50" r="15" fill="none" stroke="#f2f3f7" stroke-width="2" stroke-dasharray="2 5.8"/></g>
+          <circle class="pulse" cx="50" cy="50" r="6.5" fill="#f2f3f7"/>
+        </svg></h1>
+      <p class="tagline">Compare your track to your reference. <b>Loudness, spectrum, stereo, key</b> — and exactly what to tweak to get the same punch.</p>
+      <div class="by">by <b>Massive Impulsion</b> — Olivier ELBHAR</div>
+    </div>
+  </header>
+
+  <section class="decks">
+    <label class="slot" data-k="ref">
+      <input type="file" accept="audio/*,.wav,.mp3,.flac,.aif,.aiff,.m4a,.ogg">
+      <div class="big">A</div>
+      <span class="lab">A · REFERENCE</span>
+      <div class="t">The track that inspires you</div>
+      <div class="s">A released track in the same vein — your favourite Flume tune, for example.</div>
+      <canvas class="mini"></canvas>
+      <div class="file"><i class="dot"></i><span>Drop a file or tap here</span></div>
+    </label>
+    <div class="vs"><span>VS</span></div>
+    <label class="slot" data-k="mine">
+      <input type="file" accept="audio/*,.wav,.mp3,.flac,.aif,.aiff,.m4a,.ogg">
+      <div class="big">B</div>
+      <span class="lab">B · MY TRACK</span>
+      <div class="t">Your mix or master</div>
+      <div class="s">Export as WAV if you can, without long fades at the start or end.</div>
+      <canvas class="mini"></canvas>
+      <div class="file"><i class="dot"></i><span>Drop a file or tap here</span></div>
+    </label>
+  </section>
+
+  <div class="cta">
+    <button class="go" id="go" disabled>Run the comparison</button>
+    <div class="prog" id="prog"><div class="track"><i></i></div><span></span></div>
+  </div>
+  <div class="err" id="err"></div>
+  <div class="how">
+    <div><b>Loudness</b>Integrated and short-term LUFS, true peak and dynamics, per EBU R128 / ITU BS.1770.</div>
+    <div><b>Spectrum</b>Loudness-matched tonal balance, zone by zone, from sub to air.</div>
+    <div><b>Stereo &amp; harmony</b>Width, phase correlation, mono bass, Camelot key and BPM.</div>
+    <div><b>Action plan</b>Ranked recommendations and starting EQ moves you can audition live on your track.</div>
+  </div>
+
+  <section id="results">
+    <div class="sec-h"><span class="num">01</span><h2>Face-off</h2></div>
+    <div class="panel faceoff">
+      <div class="side a">
+        <span class="lab">A · REFERENCE</span>
+        <div class="nm" id="nmA"></div>
+        <div class="lufs"><span id="lufsA">—</span><small>LUFS</small></div>
+        <div class="chips" id="chA"></div>
+      </div>
+      <div class="gauge">
+        <svg viewBox="0 0 200 180" id="gaugeSvg"></svg>
+        <div class="gv"><span id="scoreVal">0</span><small>MATCH SCORE / 100</small></div>
+        <div class="gl" id="scoreLbl">—</div>
+        <div class="delta" id="deltaChip">—</div>
+      </div>
+      <div class="side b">
+        <span class="lab">B · MY TRACK</span>
+        <div class="nm" id="nmB"></div>
+        <div class="lufs"><span id="lufsB">—</span><small>LUFS</small></div>
+        <div class="chips" id="chB"></div>
+      </div>
+    </div>
+
+    <div class="sec-h"><span class="num">02</span><h2>Auto-match</h2><p>REFX processes your track to sound like the reference: linear-phase match EQ, stereo width and loudness (gain + true-peak limiter). It all runs in your browser — then listen to the result as B+ and download it.</p></div>
+    <div class="panel match">
+      <div class="mctl">
+        <div class="ctl"><label>Tonal match (EQ) <b id="vEq">70%</b></label><input type="range" id="mEq" min="0" max="100" value="70"><div class="hint">How much of the spectral gap to correct. 100% copies the reference's tonal balance (capped at ±12 dB).</div></div>
+        <div class="ctl"><label>Stereo width match <b id="vW">50%</b></label><input type="range" id="mW" min="0" max="100" value="50"><div class="hint">Moves your side level towards the reference's.</div></div>
+        <div class="ctl"><label>Loudness target</label><div class="seg" id="mTarget"><button data-v="ref" class="on">Reference <span id="tRef"></span></button><button data-v="stream">Streaming −14</button><button data-v="keep">Keep mine</button></div></div>
+        <div class="ctl"><label>True-peak ceiling</label><div class="seg" id="mCeil"><button data-v="-1" class="on">−1.0 dBTP</button><button data-v="-0.3">−0.3 dBTP</button><button data-v="ref">Match ref</button></div></div>
+        <label class="sw gold"><input type="checkbox" id="mMono" checked><i></i>Mono bass below 120 Hz</label>
+      </div>
+      <div class="mrun">
+        <button class="gomatch" id="goMatch"><span>Match it</span><small>apply the reference's specs to my track</small></button>
+        <div class="prog" id="mprog"><div class="track"><i></i></div><span></span></div>
+        <div class="mres" id="mres" hidden>
+          <div class="bigscore"><span class="from" id="sBefore">0</span><span class="arrow">→</span><span class="to" id="sAfter">0</span><small>MATCH SCORE<br>BEFORE → AFTER</small></div>
+          <div class="ba" id="ba"></div>
+          <div class="chain" id="chain"></div>
+          <div class="warn" id="mwarn"></div>
+          <div class="row" style="margin-top:4px"><button class="btn" id="listenMatch">▶ Listen as B+</button><div class="seg small" id="mBits"><button data-v="24" class="on">WAV 24-bit</button><button data-v="16">16-bit</button></div><button class="btn gold" id="dlMatch">Download</button></div>
+          <div class="hint" id="dlNote">The WAV comes zipped. Sample rate follows your browser's audio engine.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec-h"><span class="num">03</span><h2>A/B listening</h2><p>Switch between the two tracks at the same position. With loudness matching on, you compare the sound, not the level. Tap the waveforms to seek.</p></div>
+    <div class="panel deck">
+      <div class="screen">
+        <canvas id="cWave"></canvas>
+        <div class="live"><canvas id="cLive"></canvas><canvas id="cMeter"></canvas></div>
+      </div>
+      <div class="controls">
+        <button class="play" id="play" aria-label="Play"><svg id="icoPlay" width="22" height="22" viewBox="0 0 24 24"><path d="M7 4l14 8-14 8z" fill="currentColor"/></svg><svg id="icoPause" width="22" height="22" viewBox="0 0 24 24" style="display:none"><path d="M6 4h4v16H6zM14 4h4v16h-4z" fill="currentColor"/></svg></button>
+        <div class="abswitch">
+          <button class="on" data-w="ref"><b>A</b><span id="abA">Reference</span></button>
+          <button data-w="mine"><b>B</b><span id="abB">My track</span></button>
+          <button data-w="match" id="abM" hidden><b>B+</b><span>Matched</span></button>
+        </div>
+        <div class="time" id="time">0:00 <small>/ 0:00</small></div>
+      </div>
+      <div class="toggles">
+        <label class="sw"><input type="checkbox" id="tgMatch" checked><i></i>Loudness matched (LUFS)</label>
+        <label class="sw eq"><input type="checkbox" id="tgEq"><i></i>My track + suggested EQ</label>
+        <span class="kbd">SPACE play · A / B / M switch</span>
+      </div>
+    </div>
+
+    <div class="sec-h"><span class="num">04</span><h2>Action plan</h2><p>Ranked by priority. EQ values are starting points: begin at 50–70% and trust your ears.</p></div>
+    <div class="leg"><span><i style="background:var(--hi)"></i>HIGH PRIORITY</span><span><i style="background:var(--mid)"></i>TO ADJUST</span><span><i style="background:var(--ok)"></i>OK</span><span><i style="background:var(--info)"></i>INFO</span></div>
+    <div class="recs" id="recs"></div>
+
+    <div class="sec-h"><span class="num">05</span><h2>Tonal balance</h2><p>The glowing line = the reference (±1 dB tolerance band). The slider = your track, loudness-matched.</p></div>
+    <div class="panel">
+      <div class="faders" id="faders"></div>
+      <div class="chart-title"><h3>Average spectrum</h3><div class="legend"><span><i style="background:var(--a)"></i>A · Reference (area)</span><span><i style="background:var(--b)"></i>B · My track (line)</span></div></div>
+      <canvas id="cSpec"></canvas>
+      <div class="readout" id="readout">Hover or drag on the charts to read values.</div>
+      <div class="chart-title"><h3>Gap: Ref − Mine</h3><span>above 0: you're missing energy → boost · below 0: you have too much → cut</span></div>
+      <canvas id="cDiff"></canvas>
+      <p class="note">The spectrum also reflects the arrangement: if the reference has a vocal and yours doesn't, the mids will differ no matter what. Treat the gap as a map, not a hard rule.</p>
+    </div>
+
+    <div class="sec-h"><span class="num">06</span><h2>Suggested EQ</h2><p>Put it on your master bus (before the limiter) or spread it across the relevant tracks. Turn on "My track + suggested EQ" in A/B listening to hear it.</p></div>
+    <div class="panel">
+      <canvas id="cEq"></canvas>
+      <div class="bands" id="bands"></div>
+      <div class="row"><button class="btn" id="copyEq">Copy EQ settings</button></div>
+    </div>
+
+    <div class="sec-h"><span class="num">07</span><h2>Metrics</h2></div>
+    <div class="tiles" id="tiles"></div>
+    <details><summary>FULL TABLE</summary><div class="tblwrap"><table id="metrics"></table></div></details>
+
+    <div class="sec-h"><span class="num">08</span><h2>Loudness over time</h2><p>Short-term loudness (3 s windows) across the whole track. Thin lines = integrated LUFS.</p></div>
+    <div class="panel">
+      <div class="legend" style="margin-bottom:10px"><span><i style="background:var(--a)"></i>A · Reference</span><span><i style="background:var(--b)"></i>B · My track (dashed)</span></div>
+      <canvas id="cTime"></canvas>
+    </div>
+
+    <div class="row"><button class="btn" id="copyReport">Copy full report</button><button class="btn" id="again">Compare other tracks</button></div>
+  </section>
+
+  <footer class="mi">
+    <svg class="mi-logo" viewBox="0 0 660 200" role="img" aria-label="Massive Impulsion">
+      <g transform="translate(0 16.8) scale(1.6)">
+        <polygon points="4,12 96,12 64.95,66 35.05,66" fill="#F2EDE2"/>
+        <polygon points="38.5,72 61.5,72 50,92" fill="#D6A85C"/>
+      </g>
+      <text x="200" y="105.5" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="97" font-weight="700" textLength="440" lengthAdjust="spacing" fill="#F2EDE2">MASSIVE</text>
+      <text x="200" y="164" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="52" font-weight="300" textLength="440" lengthAdjust="spacing" fill="#F2EDE2">IMPULSION</text>
+    </svg>
+    <div class="mi-by">by <b>Olivier ELBHAR</b></div>
+    <div class="mi-ver"><b>REFX</b> v0.2 · draft</div>
+  </footer>
+</div>
+<div class="toast" id="toast"></div>
+<script id="engine">
+const Engine = (() => {
+  const tick = () => new Promise(r => setTimeout(r, 0));
+  const LK = z => z > 0 ? -0.691 + 10 * Math.log10(z) : -Infinity;
+  const dB = x => x > 0 ? 20 * Math.log10(x) : -Infinity;
+  const pdB = x => x > 0 ? 10 * Math.log10(x) : -Infinity;
+
+  // ---- ITU-R BS.1770 K-weighting (coefficients for any sample rate, as libebur128)
+  function kCoefs(fs) {
+    let f0 = 1681.974450955533, G = 3.999843853973347, Q = 0.7071752369554196;
+    let K = Math.tan(Math.PI * f0 / fs);
+    const Vh = Math.pow(10, G / 20), Vb = Math.pow(Vh, 0.4996667741545416);
+    let a0 = 1 + K / Q + K * K;
+    const hs = { b0: (Vh + Vb * K / Q + K * K) / a0, b1: 2 * (K * K - Vh) / a0, b2: (Vh - Vb * K / Q + K * K) / a0,
+                 a1: 2 * (K * K - 1) / a0, a2: (1 - K / Q + K * K) / a0 };
+    f0 = 38.13547087602444; Q = 0.5003270373238773; K = Math.tan(Math.PI * f0 / fs);
+    a0 = 1 + K / Q + K * K;
+    const hp = { b0: 1, b1: -2, b2: 1, a1: 2 * (K * K - 1) / a0, a2: (1 - K / Q + K * K) / a0 };
+    return { hs, hp };
+  }
+
+  // ---- FFT (radix-2, in place)
+  const fftCache = {};
+  function getFFT(n) {
+    if (fftCache[n]) return fftCache[n];
+    const lv = Math.log2(n), rev = new Uint32Array(n);
+    for (let i = 0; i < n; i++) { let r = 0, x = i; for (let j = 0; j < lv; j++) { r = (r << 1) | (x & 1); x >>= 1; } rev[i] = r; }
+    const cs = new Float64Array(n / 2), sn = new Float64Array(n / 2);
+    for (let i = 0; i < n / 2; i++) { cs[i] = Math.cos(2 * Math.PI * i / n); sn[i] = Math.sin(2 * Math.PI * i / n); }
+    const win = new Float64Array(n);
+    for (let i = 0; i < n; i++) win[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / (n - 1));
+    const fft = (re, im) => {
+      for (let i = 0; i < n; i++) { const j = rev[i]; if (j > i) { let t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; } }
+      for (let size = 2; size <= n; size <<= 1) {
+        const half = size >> 1, step = n / size;
+        for (let i = 0; i < n; i += size) {
+          for (let j = i, k = 0; j < i + half; j++, k += step) {
+            const xr = re[j + half], xi = im[j + half];
+            const tr = xr * cs[k] + xi * sn[k], ti = xi * cs[k] - xr * sn[k];
+            re[j + half] = re[j] - tr; im[j + half] = im[j] - ti;
+            re[j] += tr; im[j] += ti;
+          }
+        }
+      }
+    };
+    return (fftCache[n] = { fft, win });
+  }
+
+  // ---- True peak (4x oversampling, Lanczos-8 interpolation around loud samples)
+  const sinc = x => x === 0 ? 1 : Math.sin(Math.PI * x) / (Math.PI * x);
+  const TP = [0.25, 0.5, 0.75].map(f => {
+    const a = new Float64Array(16); let s = 0;
+    for (let t = -7; t <= 8; t++) { const d = t - f; a[t + 7] = sinc(d) * sinc(d / 8); s += a[t + 7]; }
+    for (let i = 0; i < 16; i++) a[i] /= s;
+    return a;
+  });
+  function truePeak(x, sp) {
+    let tp = sp; const thr = sp * 0.7, n = x.length - 9;
+    for (let i = 7; i < n; i++) {
+      const a = x[i] < 0 ? -x[i] : x[i], b = x[i + 1] < 0 ? -x[i + 1] : x[i + 1];
+      if (a < thr && b < thr) continue;
+      for (let q = 0; q < 3; q++) {
+        const c = TP[q]; let s = 0;
+        for (let t = 0; t < 16; t++) s += c[t] * x[i - 7 + t];
+        if (s < 0) s = -s; if (s > tp) tp = s;
+      }
+    }
+    return tp;
+  }
+
+  // ---- Bands (1/6 octave, 20 Hz – 20 kHz)
+  function bandCenters(sr) {
+    const out = [];
+    for (let i = 0; ; i++) { const f = 20 * Math.pow(2, i / 6); if (f > Math.min(20000, sr / 2 * 0.96)) break; out.push(f); }
+    return out;
+  }
+
+  // ---- Key profiles (Krumhansl-Kessler)
+  const KMAJ = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88];
+  const KMIN = [6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17];
+  const NOTES_EN = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
+  const NOTES_FR = ['C', 'C♯', 'D', 'E♭', 'E', 'F', 'F♯', 'G', 'A♭', 'A', 'B♭', 'B'];
+  const CAM_MAJ = [8, 3, 10, 5, 12, 7, 2, 9, 4, 11, 6, 1];
+  const CAM_MIN = [5, 12, 7, 2, 9, 4, 11, 6, 1, 8, 3, 10];
+  function corr(a, b) {
+    const n = a.length; let ma = 0, mb = 0;
+    for (let i = 0; i < n; i++) { ma += a[i]; mb += b[i]; } ma /= n; mb /= n;
+    let s = 0, sa = 0, sb = 0;
+    for (let i = 0; i < n; i++) { const x = a[i] - ma, y = b[i] - mb; s += x * y; sa += x * x; sb += y * y; }
+    return s / Math.sqrt(sa * sb || 1);
+  }
+  function detectKey(chroma) {
+    let best = { r: -2 };
+    for (let t = 0; t < 12; t++) {
+      const rot = i => chroma[(i + t) % 12];
+      const c = Array.from({ length: 12 }, (_, i) => rot(i));
+      const rM = corr(c, KMAJ), rm = corr(c, KMIN);
+      if (rM > best.r) best = { r: rM, tonic: t, mode: 'maj' };
+      if (rm > best.r) best = { r: rm, tonic: t, mode: 'min' };
+    }
+    const t = best.tonic, mn = best.mode === 'min';
+    return {
+      tonic: t, mode: best.mode, confidence: best.r,
+      fr: NOTES_FR[t] + (mn ? ' minor' : ' major'),
+      en: NOTES_EN[t] + (mn ? 'm' : ''),
+      camelot: (mn ? CAM_MIN[t] : CAM_MAJ[t]) + (mn ? 'A' : 'B'),
+      camNum: mn ? CAM_MIN[t] : CAM_MAJ[t], camLetter: mn ? 'A' : 'B'
+    };
+  }
+
+  // ---- BPM (spectral flux + autocorrelation with comb and tempo prior)
+  async function detectBPM(L, R, sr) {
+    const N = 1024, hop = 512, { fft, win } = getFFT(N);
+    const start = Math.floor(L.length * 0.08), end = Math.min(L.length - N, start + Math.floor(sr * 120));
+    const nF = Math.floor((end - start) / hop);
+    if (nF < 300) return null;
+    const re = new Float64Array(N), im = new Float64Array(N);
+    const kMax = Math.min(N / 2, Math.floor(8000 * N / sr));
+    let prev = new Float64Array(kMax), cur = new Float64Array(kMax);
+    const flux = new Float64Array(nF);
+    for (let f = 0; f < nF; f++) {
+      const off = start + f * hop;
+      for (let i = 0; i < N; i++) { re[i] = (L[off + i] + R[off + i]) * win[i]; im[i] = 0; }
+      fft(re, im);
+      let s = 0;
+      for (let k = 1; k < kMax; k++) {
+        const m = Math.log1p(100 * Math.sqrt(re[k] * re[k] + im[k] * im[k]));
+        cur[k] = m; const d = m - prev[k]; if (d > 0) s += d;
+      }
+      flux[f] = f ? s : 0;
+      const t = prev; prev = cur; cur = t;
+      if (f % 2000 === 0) await tick();
+    }
+    // local mean removal + half-wave rectification
+    const on = new Float64Array(nF), W = 8;
+    for (let i = 0; i < nF; i++) {
+      let s = 0, c = 0;
+      for (let j = Math.max(0, i - W); j <= Math.min(nF - 1, i + W); j++) { s += flux[j]; c++; }
+      on[i] = Math.max(0, flux[i] - s / c);
+    }
+    const fps = sr / hop;
+    const lagMin = Math.floor(60 * fps / 200), lagMax = Math.ceil(60 * fps / 60);
+    const acf = new Float64Array(lagMax * 4 + 2);
+    for (let lag = 1; lag < acf.length && lag < nF / 2; lag++) {
+      let s = 0; for (let i = 0; i + lag < nF; i++) s += on[i] * on[i + lag];
+      acf[lag] = s / (nF - lag);
+    }
+    const score = lag => {
+      const bpm = 60 * fps / lag;
+      const w = Math.exp(-0.5 * Math.pow(Math.log2(bpm / 120) / 0.9, 2));
+      return w * (acf[lag] + 0.5 * (acf[2 * lag] || 0) + 0.25 * (acf[4 * lag] || 0));
+    };
+    let best = lagMin, bs = -1;
+    for (let lag = lagMin; lag <= lagMax; lag++) { const s = score(lag); if (s > bs) { bs = s; best = lag; } }
+    const y0 = score(best - 1), y1 = score(best), y2 = score(best + 1);
+    const den = y0 - 2 * y1 + y2;
+    const lagR = best + (den !== 0 ? 0.5 * (y0 - y2) / den : 0);
+    return Math.round(60 * fps / lagR * 10) / 10;
+  }
+
+  // ---- Main analysis
+  async function analyze(chs, sr, prog = () => {}) {
+    const L = chs[0], R = chs[1] || chs[0], len = L.length, mono = !chs[1];
+    const out = { sr, duration: len / sr, mono };
+    const { hs, hp } = kCoefs(sr);
+    const hb0 = hs.b0, hb1 = hs.b1, hb2 = hs.b2, ha1 = hs.a1, ha2 = hs.a2, pa1 = hp.a1, pa2 = hp.a2;
+    const bs = Math.round(sr * 0.1), nB = Math.floor(len / bs);
+    const blk = new Float64Array(Math.max(nB, 1));
+    let l1 = 0, l2 = 0, l3 = 0, l4 = 0, r1 = 0, r2 = 0, r3 = 0, r4 = 0;
+    let pkL = 0, pkR = 0, sLL = 0, sRR = 0, sLR = 0, acc = 0, bi = 0, inB = 0;
+    const CH = 1 << 19;
+    prog(0, 'loudness');
+    for (let st = 0; st < len; st += CH) {
+      const en = Math.min(len, st + CH);
+      for (let i = st; i < en; i++) {
+        const l = L[i], r = R[i];
+        const al = l < 0 ? -l : l, ar = r < 0 ? -r : r;
+        if (al > pkL) pkL = al; if (ar > pkR) pkR = ar;
+        sLL += l * l; sRR += r * r; sLR += l * r;
+        let y = hb0 * l + l1; l1 = hb1 * l - ha1 * y + l2; l2 = hb2 * l - ha2 * y;
+        const yl = y + l3; l3 = -2 * y - pa1 * yl + l4; l4 = y - pa2 * yl;
+        y = hb0 * r + r1; r1 = hb1 * r - ha1 * y + r2; r2 = hb2 * r - ha2 * y;
+        const yr = y + r3; r3 = -2 * y - pa1 * yr + r4; r4 = y - pa2 * yr;
+        acc += yl * yl + (mono ? 0 : yr * yr);
+        if (++inB === bs) { if (bi < nB) blk[bi++] = acc / bs; acc = 0; inB = 0; }
+      }
+      prog(0.4 * en / len, 'loudness');
+      await tick();
+    }
+    // Momentary blocks (400 ms, 75 % overlap) → integrated
+    const zM = [];
+    for (let j = 0; j + 4 <= nB; j++) zM.push((blk[j] + blk[j + 1] + blk[j + 2] + blk[j + 3]) / 4);
+    const gate = (zs, rel) => {
+      const a = zs.filter(z => LK(z) > -70);
+      if (!a.length) return [];
+      const m = a.reduce((s, z) => s + z, 0) / a.length, thr = LK(m) + rel;
+      return a.filter(z => LK(z) > thr);
+    };
+    const keptI = gate(zM, -10);
+    out.I = keptI.length ? LK(keptI.reduce((s, z) => s + z, 0) / keptI.length) : -Infinity;
+    out.Mmax = zM.length ? LK(Math.max(...zM)) : -Infinity;
+    // Short-term (3 s, 10 Hz) → LRA, max, timeline
+    const zS = []; let run = 0;
+    for (let j = 0; j < nB; j++) { run += blk[j]; if (j >= 30) run -= blk[j - 30]; if (j >= 29) zS.push(run / 30); }
+    out.Smax = zS.length ? LK(Math.max(...zS)) : out.Mmax;
+    const keptS = gate(zS, -20).map(LK).sort((a, b) => a - b);
+    out.LRA = keptS.length > 2 ? keptS[Math.min(keptS.length - 1, Math.floor(keptS.length * 0.95))] - keptS[Math.floor(keptS.length * 0.10)] : 0;
+    out.timeline = [];
+    for (let j = 0; j < zS.length; j += 10) out.timeline.push([j / 10 + 1.5, Math.max(LK(zS[j]), -60)]);
+    // Peaks, RMS, stereo
+    const sp = Math.max(pkL, pkR);
+    out.samplePeak = dB(sp);
+    out.rms = pdB((sLL + (mono ? sLL : sRR)) / (2 * len));
+    const sMM = (sLL + sRR + 2 * sLR) / 4, sSS = Math.max(0, (sLL + sRR - 2 * sLR) / 4);
+    out.corr = mono ? 1 : sLR / Math.sqrt(sLL * sRR || 1);
+    out.width = mono || sSS < 1e-12 * sMM ? -60 : Math.max(-60, pdB(sSS / sMM));
+    prog(0.42, 'true peak');
+    await tick();
+    const tpL = truePeak(L, pkL);
+    await tick();
+    const tpR = mono ? tpL : truePeak(R, pkR);
+    out.truePeak = dB(Math.max(tpL, tpR, sp));
+    out.PLR = out.truePeak - out.I;
+    out.crest = out.samplePeak - out.rms;
+    // Spectrum (mid & side, one complex FFT per frame) + chroma
+    prog(0.55, 'spectrum');
+    const N = 16384, half = N / 2, { fft, win } = getFFT(N);
+    const re = new Float64Array(N), im = new Float64Array(N);
+    const PM = new Float64Array(half + 1), PS = new Float64Array(half + 1);
+    const pcMap = new Int8Array(half + 1).fill(-1);
+    for (let k = 1; k <= half; k++) {
+      const f = k * sr / N;
+      if (f >= 80 && f <= 2000) pcMap[k] = ((Math.round(69 + 12 * Math.log2(f / 440)) % 12) + 12) % 12;
+    }
+    const chroma = new Float64Array(12), ch = new Float64Array(12);
+    let frames = 0;
+    const usable = len - N;
+    if (usable > 0) {
+      const nF = Math.min(320, Math.floor(usable / (N / 2)) + 1);
+      const hopF = nF > 1 ? usable / (nF - 1) : 0;
+      for (let f = 0; f < nF; f++) {
+        const off = Math.floor(f * hopF);
+        let e = 0;
+        for (let i = 0; i < N; i++) {
+          const l = L[off + i], r = R[off + i], m = (l + r) * 0.5, s = (l - r) * 0.5;
+          e += m * m; re[i] = m * win[i]; im[i] = s * win[i];
+        }
+        if (e / N < 1e-7) continue;
+        fft(re, im); frames++; ch.fill(0);
+        for (let k = 0; k <= half; k++) {
+          const k2 = k === 0 ? 0 : N - k;
+          const a = re[k], b = im[k], c = re[k2], d = im[k2];
+          const pm = ((a + c) * (a + c) + (b - d) * (b - d)) * 0.25;
+          const ps = ((a - c) * (a - c) + (b + d) * (b + d)) * 0.25;
+          PM[k] += pm; PS[k] += ps;
+          const pc = pcMap[k]; if (pc >= 0) ch[pc] += Math.sqrt(pm);
+        }
+        let mx = 0; for (let i = 0; i < 12; i++) if (ch[i] > mx) mx = ch[i];
+        if (mx > 0) for (let i = 0; i < 12; i++) chroma[i] += ch[i] / mx;
+        if (f % 12 === 0) { prog(0.55 + 0.3 * f / nF, 'spectrum'); await tick(); }
+      }
+    }
+    const fr = Math.max(frames, 1);
+    out.freqs = bandCenters(sr);
+    out.bandDb = out.freqs.map(fc => {
+      const lo = fc / Math.pow(2, 1 / 12), hi = fc * Math.pow(2, 1 / 12);
+      let k0 = Math.ceil(lo * N / sr), k1 = Math.floor(hi * N / sr), s = 0, c = 0;
+      if (k1 < k0) { k0 = k1 = Math.round(fc * N / sr); }
+      for (let k = k0; k <= k1; k++) { s += PM[k]; c++; }
+      return pdB(s / c / fr + 1e-20);
+    });
+    const bandSum = (P, f0, f1) => { let s = 0; for (let k = Math.ceil(f0 * N / sr); k <= Math.min(half, Math.floor(f1 * N / sr)); k++) s += P[k]; return s; };
+    const w = (f0, f1) => { const m = bandSum(PM, f0, f1), s = bandSum(PS, f0, f1); return mono || s < 1e-12 * m ? -60 : Math.max(-60, pdB(s / m)); };
+    out.widthLow = w(20, 120); out.widthMid = w(120, 2000); out.widthHigh = w(2000, 20000);
+    let cn = 0, cd = 0;
+    for (let k = 1; k <= half; k++) { const f = k * sr / N; if (f < 20 || f > 20000) continue; cn += f * PM[k]; cd += PM[k]; }
+    out.centroid = cd ? cn / cd : 0;
+    out.key = detectKey(Array.from(chroma));
+    prog(0.86, 'tempo');
+    out.bpm = await detectBPM(L, R, sr);
+    prog(1, 'ok');
+    return out;
+  }
+
+  // ---- Comparison & recommendations
+  const ZONES = [
+    { id: 'sub', name: 'Sub', shelf: 'lowshelf', sf: 60, lo: 20, hi: 60,
+      lack: "Your sub is lagging behind. Reinforce the sub of your 808 / bass (or layer a sine sub) rather than boosting the whole mix.",
+      more: "Too much sub compared to the reference. High-pass everything that has no business below 40–60 Hz: pads, vocals, FX, reverbs." },
+    { id: 'bass', name: 'Bass', lo: 60, hi: 200,
+      lack: "The low end lacks weight (kick, bass). Bring them up, or add gentle saturation to the bass so it also translates on small speakers.",
+      more: "Low end is crowded: kick and bass are stepping on each other. Sidechain the bass to the kick, or dip the bass exactly where the kick hits." },
+    { id: 'lowmid', name: 'Low mids', lo: 200, hi: 500,
+      lack: "The mix lacks body and warmth. Give more room to pads and to the body of the snare and synths around 250–400 Hz.",
+      more: "Muddy zone (the \"cardboard\" effect). Cut 200–500 Hz on pads, guitars, vocals and reverb returns: that's often where the lack of clarity hides." },
+    { id: 'mid', name: 'Mids', lo: 500, hi: 2000,
+      lack: "Scooped mids: the main elements (lead, vocal, snare) lack presence.",
+      more: "Mids too forward: nasal or \"telephone\" sound. Ease off leads and vocals around 800 Hz–1.5 kHz." },
+    { id: 'himid', name: 'High mids', lo: 2000, hi: 5000,
+      lack: "Lacking attack and definition. Add bite to the transients (snare, leads, plucks) between 2 and 5 kHz.",
+      more: "Harsh, fatiguing zone (the ear is very sensitive here). Soften synths and vocals between 2 and 5 kHz." },
+    { id: 'pres', name: 'Presence', lo: 5000, hi: 10000,
+      lack: "Lacking clarity and sparkle (hats, snare, vocals). Small wide boost around 6–8 kHz.",
+      more: "Too bright: hats and sibilance jump out. De-ess, or a gentle cut around 6–8 kHz." },
+    { id: 'air', name: 'Air', shelf: 'highshelf', sf: 10000, lo: 10000, hi: 20000,
+      lack: "Lacking air and openness. Gentle high shelf at 10–12 kHz (or an exciter) on the master or music bus.",
+      more: "Too much extreme top end: hiss or a \"cheap\" sound. Light negative shelf above 10 kHz." }
+  ];
+  const smooth = (a, w) => { const h = (w - 1) >> 1; return a.map((_, i) => { let s = 0, c = 0; for (let j = Math.max(0, i - h); j <= Math.min(a.length - 1, i + h); j++) { s += a[j]; c++; } return s / c; }); };
+  const fmt = (x, d = 1) => (Math.round(x * Math.pow(10, d)) / Math.pow(10, d)).toFixed(d).replace('-', '−');
+  const sgn = (x, d = 1) => (x > 0 ? '+' : '') + fmt(x, d);
+  const fmtF = f => f >= 1000 ? fmt(f / 1000, f >= 10000 ? 0 : 1) + ' kHz' : Math.round(f) + ' Hz';
+  const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+  const typeName = t => t === 'peaking' ? 'bell' : t === 'lowshelf' ? 'low shelf' : 'high shelf';
+
+  function camCompat(a, b) {
+    if (a.camNum === b.camNum && a.camLetter === b.camLetter) return 'same key';
+    if (a.camNum === b.camNum) return 'compatible (relative major/minor)';
+    const d = Math.abs(a.camNum - b.camNum);
+    if (a.camLetter === b.camLetter && (d === 1 || d === 11)) return 'compatible (adjacent)';
+    return 'not compatible';
+  }
+
+  function compare(ref, mine) {
+    if (!isFinite(ref.I) || !isFinite(mine.I)) throw new Error("One of the files seems silent or too short.");
+    const n = Math.min(ref.freqs.length, mine.freqs.length), freqs = ref.freqs.slice(0, n);
+    const tilt = f => 3 * Math.log2(f / 1000);
+    const refN = smooth(ref.bandDb.slice(0, n).map(v => v - ref.I), 3);
+    const mineN = smooth(mine.bandDb.slice(0, n).map(v => v - mine.I), 3);
+    const refD = refN.map((v, i) => v + tilt(freqs[i])), mineD = mineN.map((v, i) => v + tilt(freqs[i]));
+    const diffRaw = refN.map((v, i) => v - mineN[i]);
+    const diffSm = smooth(diffRaw, 5);
+    const eq = [], recs = [], zoneStats = [];
+    for (const z of ZONES) {
+      const idx = freqs.map((f, i) => (f >= z.lo && f < z.hi ? i : -1)).filter(i => i >= 0);
+      if (!idx.length) continue;
+      const mean = idx.reduce((s, i) => s + diffSm[i], 0) / idx.length;
+      zoneStats.push({ name: z.name, mean });
+      if (Math.abs(mean) < 1) continue;
+      let pk = idx[0];
+      for (const i of idx) if (Math.sign(diffSm[i]) === Math.sign(mean) && Math.abs(diffSm[i]) > Math.abs(diffSm[pk])) pk = i;
+      const oct = Math.log2(z.hi / z.lo), bw = Math.pow(2, oct);
+      const g = clamp(Math.round(mean * 2) / 2, -6, 6);
+      const item = z.shelf
+        ? { zone: z.name, type: z.shelf, f: z.sf, gain: g, q: 0.7 }
+        : { zone: z.name, type: 'peaking', f: Math.round(freqs[pk] / 10) * 10, gain: g, q: Math.round(Math.sqrt(bw) / (bw - 1) * 10) / 10 };
+      eq.push(item);
+      const a = Math.abs(mean);
+      recs.push({
+        level: a >= 3 ? 'high' : 'mid', pill: 'EQ · ' + z.name.toUpperCase(), w: a * 1.6,
+        title: (mean > 0 ? 'Not enough ' : 'Too much ') + z.name.toLowerCase() + ' (' + sgn(-mean) + ' dB vs ref)',
+        text: (mean > 0 ? z.lack : z.more) + ' Starting point: ' + typeName(item.type) + ' at ' + fmtF(item.f) + ', ' + sgn(item.gain) + ' dB' + (item.type === 'peaking' ? ', Q ' + fmt(item.q) : '') + '.'
+      });
+    }
+    const rS = smooth(refN, 9), mS = smooth(mineN, 9), res = [];
+    for (let i = 1; i < n - 1; i++) {
+      const f = freqs[i]; if (f < 80 || f > 8000) continue;
+      const r = (mineN[i] - mS[i]) - (refN[i] - rS[i]);
+      const rp = (mineN[i - 1] - mS[i - 1]) - (refN[i - 1] - rS[i - 1]), rn = (mineN[i + 1] - mS[i + 1]) - (refN[i + 1] - rS[i + 1]);
+      if (r > 3 && r >= rp && r >= rn) res.push({ f, r });
+    }
+    res.sort((a, b) => b.r - a.r).slice(0, 2).forEach(o => {
+      const g = -clamp(Math.round(o.r * 0.7 * 2) / 2, 1, 6);
+      eq.push({ zone: 'Resonance', type: 'peaking', f: Math.round(o.f / 10) * 10, gain: g, q: 5 });
+      recs.push({ level: 'mid', pill: 'RESONANCE', w: o.r,
+        title: 'Narrow bump around ' + fmtF(o.f),
+        text: 'Your track has a ' + sgn(o.r) + ' dB peak relative to its surroundings that the reference doesn\'t have. Narrow cut (Q ≈ 5) of ' + sgn(g) + ' dB — or better: find the element that rings (bass, snare, reverb) and fix it at the source.' });
+    });
+    eq.sort((a, b) => a.f - b.f);
+    const dI = ref.I - mine.I, dPLR = mine.PLR - ref.PLR;
+    if (dI > 1) {
+      const extra = (mine.truePeak + dI) - Math.max(ref.truePeak, -1);
+      let t = 'Your track sits at ' + fmt(mine.I) + ' LUFS vs ' + fmt(ref.I) + ' for the reference. ';
+      t += extra > 0.5
+        ? 'Simple gain won\'t do it: your peaks would overshoot by ' + fmt(extra) + ' dB. You need about ' + fmt(extra) + ' dB more density: gentle bus compression (2:1, 1–3 dB of gain reduction), a light clipper on the transients, then the limiter (ceiling −1 dBTP).'
+        : 'You have the headroom: push your limiter input gain by about ' + fmt(dI) + ' dB (ceiling −1 dBTP, true peak on).';
+      recs.push({ level: dI >= 3 ? 'high' : 'mid', pill: 'LOUDNESS', w: dI * 2.2, title: 'You\'re ' + fmt(dI) + ' LU short on perceived loudness', text: t });
+    } else if (dI < -1) {
+      recs.push({ level: dI < -2 ? 'mid' : 'info', pill: 'LOUDNESS', w: -dI, title: 'You\'re ' + fmt(-dI) + ' LU louder than the reference',
+        text: 'Nothing mandatory, but make sure you\'re not crushing your transients. Streaming platforms normalise loudness (Spotify and YouTube around −14 LUFS): beyond that your track gets turned down, and you lose punch without gaining perceived volume.' });
+    } else {
+      recs.push({ level: 'ok', pill: 'LOUDNESS', w: 0.5, title: 'Loudness matched (' + sgn(-dI) + ' LU)', text: 'Your perceived level is already in the reference\'s zone. Focus on tonal balance and dynamics.' });
+    }
+    if (dPLR > 2) recs.push({ level: dPLR > 4 ? 'high' : 'mid', pill: 'DYNAMICS', w: dPLR * 1.4, title: 'More dynamic than the reference (PLR ' + fmt(mine.PLR) + ' vs ' + fmt(ref.PLR) + ' dB)',
+      text: 'The reference is denser — that\'s often where the punch comes from. Compress your buses (drums, music) and/or add parallel compression on the drums before chasing level at the limiter.' });
+    else if (dPLR < -2) recs.push({ level: dPLR < -4 ? 'high' : 'mid', pill: 'DYNAMICS', w: -dPLR * 1.4, title: 'More squashed than the reference (PLR ' + fmt(mine.PLR) + ' vs ' + fmt(ref.PLR) + ' dB)',
+      text: 'You\'re compressing or limiting harder than the reference: kick and snare lose impact. Back off 1–3 dB of limiter gain reduction and let the transients breathe.' });
+    if (mine.truePeak > -1) recs.push({ level: mine.truePeak > 0 ? 'high' : 'mid', pill: 'TRUE PEAK', w: 3 + mine.truePeak, title: 'True peak at ' + fmt(mine.truePeak) + ' dBTP',
+      text: 'Risk of distortion when encoded (MP3, AAC, Ogg on streaming platforms). Set your limiter ceiling to −1 dBTP with true-peak detection on.' });
+    const dLRA = mine.LRA - ref.LRA;
+    if (Math.abs(dLRA) > 3) recs.push({ level: 'info', pill: 'MACRO DYNAMICS', w: 1, title: 'LRA gap: ' + fmt(mine.LRA) + ' vs ' + fmt(ref.LRA) + ' LU',
+      text: dLRA > 0 ? 'Level changes between your sections (intro, break, drop) are bigger than in the reference. Normal for a mix — keep an eye on it if your breaks feel too quiet.' : 'Your sections are more uniform in level than the reference: a slightly calmer break can make the drop hit harder.' });
+    const dW = mine.width - ref.width;
+    if (!mine.mono && mine.corr < 0.2) recs.push({ level: 'high', pill: 'PHASE', w: 5, title: 'Low stereo correlation (' + fmt(mine.corr, 2) + ')',
+      text: 'Risk of cancellation in mono (club systems, phones, Bluetooth speakers). Check your wideners, offset doubles and track polarity.' });
+    if (dW < -3) recs.push({ level: dW < -6 ? 'high' : 'mid', pill: 'STEREO', w: -dW * 0.8, title: 'Narrower image than the reference (' + sgn(dW) + ' dB of sides)',
+      text: 'Widen pads, synths, reverbs and backing vocals (mid/side EQ, chorus, bolder panning) — while keeping kick, bass and lead in the centre.' });
+    else if (dW > 3) recs.push({ level: 'mid', pill: 'STEREO', w: dW * 0.8, title: 'Wider image than the reference (' + sgn(dW) + ' dB of sides)',
+      text: 'It can sound spectacular on headphones but fragile in mono. Check your mix in mono and tame the most aggressive wideners.' });
+    if (mine.widthLow > -14 && mine.widthLow > ref.widthLow + 3) recs.push({ level: 'mid', pill: 'MONO BASS', w: 2.5, title: 'Low end not mono enough (' + fmt(mine.widthLow) + ' dB of sides below 120 Hz)',
+      text: 'Make everything below 100–120 Hz mono (a "bass mono" / utility tool). The low end gets more solid, especially in a club.' });
+    const cr = Math.log2(mine.centroid / ref.centroid);
+    if (Math.abs(cr) > 0.35) recs.push({ level: 'info', pill: 'COLOUR', w: 1.2, title: cr < 0 ? 'Overall darker than the reference' : 'Overall brighter than the reference',
+      text: 'Spectral centroid: ' + fmtF(mine.centroid) + ' vs ' + fmtF(ref.centroid) + '. ' + (cr < 0 ? 'See the presence / air zones above.' : 'See the high-mid / presence zones above.') });
+    const cc = camCompat(ref.key, mine.key);
+    recs.push({ level: 'info', pill: 'KEY', w: 0.3, title: mine.key.fr + ' (' + mine.key.camelot + ') vs ' + ref.key.fr + ' (' + ref.key.camelot + ')',
+      text: 'Nothing to fix in the mix. For harmonic DJ mixing, these two tracks are: ' + cc + '. Automatic estimate — confirm by ear.' });
+    if (ref.bpm && mine.bpm) recs.push({ level: 'info', pill: 'TEMPO', w: 0.2, title: 'Estimated BPM: ' + fmt(mine.bpm) + ' vs ' + fmt(ref.bpm),
+      text: 'Onset-based estimate; it can be off by a factor of 2 (e.g. 87 instead of 174 in drum & bass).' });
+    recs.sort((a, b) => ({ high: 0, mid: 1, ok: 2, info: 3 }[a.level] - { high: 0, mid: 1, ok: 2, info: 3 }[b.level]) || b.w - a.w);
+    const ti = freqs.map((f, i) => (f >= 40 && f <= 16000 ? i : -1)).filter(i => i >= 0);
+    const tonalRms = Math.sqrt(ti.reduce((s, i) => s + diffSm[i] * diffSm[i], 0) / ti.length);
+    const score = Math.round(clamp(100 - Math.min(Math.abs(dI), 10) * 3.5 - tonalRms * 6 - Math.min(Math.abs(dPLR), 10) * 2 - Math.min(Math.abs(dW), 10) * 1.2, 0, 100));
+    const scoreLabel = score >= 85 ? 'Very close to the reference' : score >= 70 ? 'Close — a few tweaks' : score >= 50 ? 'Some gaps to work on' : 'Still far from the reference';
+    return { freqs, refN, mineN, refD, mineD, diffRaw, diffSm, eq, recs, score, scoreLabel, dI, dPLR, dW, tonalRms, zoneStats, ZONES, camCompat: cc };
+  }
+
+  return { analyze, compare, fmt, sgn, fmtF, kCoefs, truePeak };
+})();
+</script>
+<script>
+// ============================ MATCHER ============================
+const Matcher = (() => {
+  const tick = () => new Promise(r => setTimeout(r, 0));
+  const dbToLin = d => Math.pow(10, d / 20);
+  const LK = z => z > 0 ? -0.691 + 10 * Math.log10(z) : -Infinity;
+
+  // Integrated loudness (ITU-R BS.1770-4, same gating as the analysis engine)
+  function lufs(L, R, sr) {
+    const { hs, hp } = Engine.kCoefs(sr);
+    const b0 = hs.b0, b1 = hs.b1, b2 = hs.b2, a1 = hs.a1, a2 = hs.a2, p1 = hp.a1, p2 = hp.a2;
+    const bs = Math.round(sr * 0.1), n = L.length, nB = Math.floor(n / bs), blk = new Float64Array(Math.max(1, nB));
+    let l1 = 0, l2 = 0, l3 = 0, l4 = 0, r1 = 0, r2 = 0, r3 = 0, r4 = 0, acc = 0, inB = 0, bi = 0;
+    for (let i = 0; i < n; i++) {
+      const l = L[i], r = R[i];
+      let y = b0 * l + l1; l1 = b1 * l - a1 * y + l2; l2 = b2 * l - a2 * y;
+      const yl = y + l3; l3 = -2 * y - p1 * yl + l4; l4 = y - p2 * yl;
+      y = b0 * r + r1; r1 = b1 * r - a1 * y + r2; r2 = b2 * r - a2 * y;
+      const yr = y + r3; r3 = -2 * y - p1 * yr + r4; r4 = y - p2 * yr;
+      acc += yl * yl + yr * yr;
+      if (++inB === bs) { if (bi < nB) blk[bi++] = acc / bs; acc = 0; inB = 0; }
+    }
+    const z = []; for (let j = 0; j + 4 <= nB; j++) z.push((blk[j] + blk[j + 1] + blk[j + 2] + blk[j + 3]) / 4);
+    const a = z.filter(v => LK(v) > -70); if (!a.length) return -Infinity;
+    const m = a.reduce((s, v) => s + v, 0) / a.length, thr = LK(m) - 10;
+    const k = a.filter(v => LK(v) > thr);
+    return LK(k.reduce((s, v) => s + v, 0) / k.length);
+  }
+
+  // ---- FFT for FIR design
+  function fft(re, im) {
+    const n = re.length;
+    for (let i = 1, j = 0; i < n; i++) { let bit = n >> 1; for (; j & bit; bit >>= 1) j ^= bit; j ^= bit; if (i < j) { let t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; } }
+    for (let len = 2; len <= n; len <<= 1) {
+      const ang = -2 * Math.PI / len, wr = Math.cos(ang), wi = Math.sin(ang);
+      for (let i = 0; i < n; i += len) {
+        let cr = 1, ci = 0;
+        for (let j = 0; j < len / 2; j++) {
+          const ar = re[i + j + len / 2], ai = im[i + j + len / 2];
+          const tr = ar * cr - ai * ci, ti = ar * ci + ai * cr;
+          re[i + j + len / 2] = re[i + j] - tr; im[i + j + len / 2] = im[i + j] - ti;
+          re[i + j] += tr; im[i + j] += ti;
+          const nc = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = nc;
+        }
+      }
+    }
+  }
+
+  // Target EQ curve in dB at any frequency, from the smoothed spectral gap
+  function curveFn(cmp, amount, maxDb) {
+    const F = cmp.freqs, D = cmp.diffSm.map(v => Math.max(-maxDb, Math.min(maxDb, v)) * amount);
+    const lf = F.map(f => Math.log(f));
+    return f => {
+      if (f <= 0) return 0;
+      let v;
+      const x = Math.log(f);
+      if (x <= lf[0]) v = D[0];
+      else if (x >= lf[lf.length - 1]) v = D[D.length - 1];
+      else { let i = 1; while (lf[i] < x) i++; const u = (x - lf[i - 1]) / (lf[i] - lf[i - 1]); v = D[i - 1] + u * (D[i] - D[i - 1]); }
+      // fade the correction out at the extremes (no rumble or ultrasonic boosts)
+      if (f < 30) v *= Math.max(0, (f - 15) / 15);
+      if (f > 16000) v *= Math.max(0, 1 - (f - 16000) / 6000);
+      return v;
+    };
+  }
+
+  // Linear-phase FIR from a dB curve (frequency sampling + Blackman window)
+  function designFIR(curve, sr, N) {
+    const re = new Float64Array(N), im = new Float64Array(N);
+    for (let k = 0; k <= N / 2; k++) { const g = Math.pow(10, curve(k * sr / N) / 20); re[k] = g; if (k > 0 && k < N / 2) re[N - k] = g; }
+    fft(re, im);
+    const h = new Float32Array(N);
+    for (let n = 0; n < N; n++) {
+      const src = (n + N / 2) % N;
+      const w = 0.42 - 0.5 * Math.cos(2 * Math.PI * n / (N - 1)) + 0.08 * Math.cos(4 * Math.PI * n / (N - 1));
+      h[n] = re[src] / N * w;
+    }
+    return h;
+  }
+
+  async function convolve(L, R, fir, sr) {
+    const N = fir.length, len = L.length;
+    const Off = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    const off = new Off(2, len + N, sr);
+    const b = off.createBuffer(2, len, sr); b.copyToChannel(L, 0); b.copyToChannel(R, 1);
+    const ir = off.createBuffer(2, N, sr); ir.copyToChannel(fir, 0); ir.copyToChannel(fir, 1);
+    const src = off.createBufferSource(); src.buffer = b;
+    const conv = off.createConvolver(); conv.normalize = false; conv.buffer = ir;
+    src.connect(conv); conv.connect(off.destination); src.start();
+    const out = await off.startRendering();
+    const d = N / 2;
+    return [out.getChannelData(0).slice(d, d + len), out.getChannelData(1).slice(d, d + len)];
+  }
+
+  // Mid/side width + optional mono bass (2nd-order high-pass on the side below 120 Hz)
+  function stereo(L, R, sr, sideGain, monoBass) {
+    const n = L.length;
+    let b0 = 1, b1 = 0, b2 = 0, a1 = 0, a2 = 0;
+    if (monoBass) {
+      const w = 2 * Math.PI * 120 / sr, c = Math.cos(w), al = Math.sin(w) / (2 * Math.SQRT1_2), a0 = 1 + al;
+      b0 = (1 + c) / 2 / a0; b1 = -(1 + c) / a0; b2 = (1 + c) / 2 / a0; a1 = -2 * c / a0; a2 = (1 - al) / a0;
+    }
+    let z1 = 0, z2 = 0;
+    for (let i = 0; i < n; i++) {
+      const m = (L[i] + R[i]) * 0.5; let s = (L[i] - R[i]) * 0.5;
+      if (monoBass) { const y = b0 * s + z1; z1 = b1 * s - a1 * y + z2; z2 = b2 * s - a2 * y; s = y; }
+      s *= sideGain;
+      L[i] = m + s; R[i] = m - s;
+    }
+  }
+
+  // Look-ahead brickwall limiter (offline): sliding-min of the required gain, then a moving average
+  // over the look-ahead window (so the gain is fully down at every peak) and a smooth release.
+  function limit(L, R, g, ceil, sr, oL, oR) {
+    const n = L.length, W = Math.max(2, Math.round(sr * 0.0015)), rel = Math.exp(-1 / (sr * 0.09));
+    const need = new Float32Array(n);
+    for (let i = 0; i < n; i++) { const p = Math.max(Math.abs(L[i]), Math.abs(R[i])) * g; need[i] = p > ceil ? ceil / p : 1; }
+    const mn = new Float32Array(n), dq = new Int32Array(n);
+    let h = 0, t = 0;
+    for (let j = 0; j < n + W - 1; j++) {
+      if (j < n) { while (t > h && need[dq[t - 1]] >= need[j]) t--; dq[t++] = j; }
+      const idx = j - W + 1;
+      if (idx >= 0) { while (dq[h] < idx) h++; mn[idx] = need[dq[h]]; }
+    }
+    let acc = W, env = 1, minEnv = 1, sumGR = 0;
+    for (let i = 0; i < n; i++) {
+      acc += mn[i] - (i - W >= 0 ? mn[i - W] : 1);
+      const a = acc / W;
+      env = a < env ? a : env + (a - env) * (1 - rel);
+      if (env < minEnv) minEnv = env;
+      sumGR += env;
+      oL[i] = L[i] * g * env; oR[i] = R[i] * g * env;
+    }
+    return { maxGR: -20 * Math.log10(minEnv), avgGR: -20 * Math.log10(sumGR / n) };
+  }
+
+  async function process(buf, ref, mine, cmp, o, prog = () => {}) {
+    const sr = buf.sampleRate;
+    let L = buf.getChannelData(0).slice(), R = (buf.numberOfChannels > 1 ? buf.getChannelData(1) : buf.getChannelData(0)).slice();
+    const info = { steps: [] };
+    // 1. match EQ
+    if (o.eq > 0) {
+      prog(0.05, 'designing match EQ');
+      const curve = curveFn(cmp, o.eq, 12);
+      const fir = designFIR(curve, sr, 8192);
+      prog(0.12, 'applying match EQ');
+      [L, R] = await convolve(L, R, fir, sr);
+      info.curve = curve;
+      info.steps.push('Match EQ at ' + Math.round(o.eq * 100) + '%');
+    }
+    await tick();
+    // 2. stereo
+    const dW = Math.max(-6, Math.min(6, ref.width - mine.width));
+    const sideGain = mine.mono ? 1 : dbToLin(dW * o.width);
+    if (o.width > 0 || o.monoBass) {
+      prog(0.3, 'stereo image');
+      stereo(L, R, sr, sideGain, o.monoBass);
+      if (o.width > 0 && !mine.mono) info.steps.push('Sides ' + (dW * o.width > 0 ? '+' : '') + (dW * o.width).toFixed(1) + ' dB');
+      if (o.monoBass) info.steps.push('Mono below 120 Hz');
+    }
+    await tick();
+    // 3. loudness: gain + limiter, iterated until the target LUFS is reached
+    prog(0.38, 'measuring loudness');
+    const I0 = lufs(L, R, sr);
+    const target = o.target === 'ref' ? ref.I : o.target === 'stream' ? -14 : I0;
+    let ceilDb = o.ceiling === 'ref' ? Math.min(ref.truePeak, -0.1) : o.ceiling;
+    let ceil = dbToLin(ceilDb - 0.3);
+    let gDb = target - I0;
+    const oL = new Float32Array(L.length), oR = new Float32Array(R.length);
+    let I = I0, lim = { maxGR: 0, avgGR: 0 };
+    for (let it = 0; it < 7; it++) {
+      prog(0.42 + it * 0.06, 'limiting · pass ' + (it + 1));
+      await tick();
+      lim = limit(L, R, dbToLin(gDb), ceil, sr, oL, oR);
+      I = lufs(oL, oR, sr);
+      const e = target - I;
+      if (Math.abs(e) < 0.05 || gDb > 30) break;
+      gDb += e * (lim.avgGR > 3 ? 1.25 : 1);
+    }
+    prog(0.86, 'checking true peak');
+    await tick();
+    let tp = 20 * Math.log10(Math.max(Engine.truePeak(oL, peakOf(oL)), Engine.truePeak(oR, peakOf(oR))));
+    if (tp > ceilDb + 0.05) {
+      ceil *= dbToLin(ceilDb - tp - 0.05);
+      lim = limit(L, R, dbToLin(gDb), ceil, sr, oL, oR);
+      I = lufs(oL, oR, sr);
+      tp = 20 * Math.log10(Math.max(Engine.truePeak(oL, peakOf(oL)), Engine.truePeak(oR, peakOf(oR))));
+    }
+    info.steps.push('Gain ' + (gDb > 0 ? '+' : '') + gDb.toFixed(1) + ' dB → limiter (max ' + lim.maxGR.toFixed(1) + ' dB GR)');
+    Object.assign(info, { gainDb: gDb, maxGR: lim.maxGR, avgGR: lim.avgGR, I, tp, target, ceilDb, sr });
+    prog(1, 'done');
+    return { L: oL, R: oR, info };
+  }
+  const peakOf = x => { let p = 0; for (let i = 0; i < x.length; i++) { const a = x[i] < 0 ? -x[i] : x[i]; if (a > p) p = a; } return p; };
+
+  // ---- export: WAV (24-bit, or 16-bit with TPDF dither) wrapped in a stored ZIP
+  function wav(L, R, sr, bits) {
+    const n = L.length, bps = bits / 8, dataLen = n * 2 * bps, u8 = new Uint8Array(44 + dataLen), v = new DataView(u8.buffer);
+    const str = (o, s) => { for (let i = 0; i < s.length; i++) u8[o + i] = s.charCodeAt(i); };
+    str(0, 'RIFF'); v.setUint32(4, 36 + dataLen, true); str(8, 'WAVE'); str(12, 'fmt ');
+    v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 2, true); v.setUint32(24, sr, true);
+    v.setUint32(28, sr * 2 * bps, true); v.setUint16(32, 2 * bps, true); v.setUint16(34, bits, true);
+    str(36, 'data'); v.setUint32(40, dataLen, true);
+    let o = 44;
+    if (bits === 24) {
+      for (let i = 0; i < n; i++) for (let c = 0; c < 2; c++) {
+        const x = c ? R[i] : L[i];
+        let s = Math.round(Math.max(-1, Math.min(1, x)) * 8388607);
+        if (s < 0) s += 16777216;
+        u8[o++] = s & 255; u8[o++] = (s >> 8) & 255; u8[o++] = (s >> 16) & 255;
+      }
+    } else {
+      for (let i = 0; i < n; i++) for (let c = 0; c < 2; c++) {
+        const x = c ? R[i] : L[i];
+        let s = Math.round(x * 32767 + (Math.random() - Math.random()));
+        s = Math.max(-32768, Math.min(32767, s)); if (s < 0) s += 65536;
+        u8[o++] = s & 255; u8[o++] = (s >> 8) & 255;
+      }
+    }
+    return u8;
+  }
+  let CRC;
+  function crc32(u8) {
+    if (!CRC) { CRC = new Uint32Array(256); for (let i = 0; i < 256; i++) { let c = i; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; CRC[i] = c >>> 0; } }
+    let c = 0xFFFFFFFF;
+    for (let i = 0; i < u8.length; i++) c = CRC[(c ^ u8[i]) & 255] ^ (c >>> 8);
+    return (c ^ 0xFFFFFFFF) >>> 0;
+  }
+  function zip(name, data) {
+    const nm = new TextEncoder().encode(name), crc = crc32(data), size = data.length;
+    const lh = new DataView(new ArrayBuffer(30));
+    lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true); lh.setUint16(8, 0, true);
+    lh.setUint16(10, 0, true); lh.setUint16(12, 0x21, true); lh.setUint32(14, crc, true); lh.setUint32(18, size, true); lh.setUint32(22, size, true);
+    lh.setUint16(26, nm.length, true); lh.setUint16(28, 0, true);
+    const cd = new DataView(new ArrayBuffer(46));
+    cd.setUint32(0, 0x02014b50, true); cd.setUint16(4, 20, true); cd.setUint16(6, 20, true); cd.setUint16(8, 0x0800, true); cd.setUint16(10, 0, true);
+    cd.setUint16(12, 0, true); cd.setUint16(14, 0x21, true); cd.setUint32(16, crc, true); cd.setUint32(20, size, true); cd.setUint32(24, size, true);
+    cd.setUint16(28, nm.length, true); cd.setUint16(30, 0, true); cd.setUint16(32, 0, true); cd.setUint16(34, 0, true); cd.setUint16(36, 0, true);
+    cd.setUint32(38, 0, true); cd.setUint32(42, 0, true);
+    const cdSize = 46 + nm.length, cdOff = 30 + nm.length + size;
+    const end = new DataView(new ArrayBuffer(22));
+    end.setUint32(0, 0x06054b50, true); end.setUint16(8, 1, true); end.setUint16(10, 1, true);
+    end.setUint32(12, cdSize, true); end.setUint32(16, cdOff, true);
+    return new Blob([lh, nm, data, cd, nm, end], { type: 'application/zip' });
+  }
+  return { process, lufs, wav, zip, crc32, limit, designFIR, curveFn, convolve };
+})();
+
+</script>
+<script>
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const { fmt, sgn, fmtF } = Engine;
+const S = { files: {}, buf: {}, dec: {}, res: {}, peaks: {}, cmp: null, ctx: null, hoverX: null };
+const COL = { ref: '#22e6c8', mine: '#ff7a2f', match: '#D6A85C' };
+const reduced = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+const esc = s => String(s).replace(/[&<>]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[ch]));
+const mmss = s => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+function audioCtx() { if (!S.ctx) S.ctx = new (window.AudioContext || window.webkitAudioContext)(); return S.ctx; }
+function prep(cv) {
+  const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
+  return { g, w, h };
+}
+const hexA = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; };
+
+// ---------- hero background
+(function heroBg() {
+  const cv = $('#bg'); let t = 0;
+  const draw = () => {
+    const { g, w, h } = prep(cv);
+    [[COL.ref, 0], [COL.mine, 1.7]].forEach(([c, ph]) => {
+      g.beginPath(); g.moveTo(0, h);
+      for (let x = 0; x <= w; x += 6) {
+        const u = x / w;
+        const y = h * (0.62 - 0.28 * Math.exp(-Math.pow((u - 0.18) / 0.16, 2)) - 0.12 * Math.sin(u * 9 + t * 0.6 + ph) * (0.6 + 0.4 * Math.sin(t * 0.3 + ph)) - 0.07 * Math.sin(u * 23 - t + ph) + 0.18 * u);
+        g.lineTo(x, y);
+      }
+      g.lineTo(w, h); g.closePath();
+      const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, hexA(c, .22)); gr.addColorStop(1, hexA(c, 0));
+      g.fillStyle = gr; g.fill();
+    });
+    t += 0.016;
+    if (!reduced && !document.hidden && !S.cmp) requestAnimationFrame(draw);
+  };
+  draw();
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && !S.cmp && !reduced) requestAnimationFrame(draw); });
+})();
+
+// ---------- upload slots
+const decode = ab => new Promise((res, rej) => audioCtx().decodeAudioData(ab, res, rej));
+function peaks(b, n) {
+  const L = b.getChannelData(0), R = b.numberOfChannels > 1 ? b.getChannelData(1) : L;
+  const size = Math.floor(L.length / n), step = Math.max(1, Math.floor(size / 300)), out = [];
+  for (let i = 0; i < n; i++) {
+    let mx = 0, s = 0, c = 0;
+    for (let j = i * size; j < (i + 1) * size; j += step) { const v = Math.max(Math.abs(L[j]), Math.abs(R[j])); if (v > mx) mx = v; s += v * v; c++; }
+    out.push([mx, Math.sqrt(s / (c || 1))]);
+  }
+  return out;
+}
+function drawMini(k) {
+  const slot = $('.slot[data-k=' + k + ']'), cv = slot.querySelector('canvas.mini'), p = S.peaks[k];
+  if (!p) return;
+  const { g, w, h } = prep(cv), n = Math.floor(w / 3);
+  for (let i = 0; i < n; i++) {
+    const q = p[Math.floor(i / n * p.length)], bh = Math.max(2, q[0] * h);
+    g.fillStyle = hexA(COL[k], .35); g.fillRect(i * 3, (h - bh) / 2, 2, bh);
+    const rh = Math.max(1, q[1] * h * 1.4); g.fillStyle = COL[k]; g.fillRect(i * 3, (h - rh) / 2, 2, rh);
+  }
+}
+$$('.slot').forEach(el => {
+  const k = el.dataset.k, input = el.querySelector('input');
+  input.addEventListener('change', () => input.files[0] && setFile(k, input.files[0]));
+  ['dragenter', 'dragover'].forEach(ev => el.addEventListener(ev, e => { e.preventDefault(); el.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach(ev => el.addEventListener(ev, e => { e.preventDefault(); el.classList.remove('over'); }));
+  el.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if (f) setFile(k, f); });
+});
+function setFile(k, f) {
+  S.files[k] = f; S.buf[k] = null; S.peaks[k] = null;
+  const el = $('.slot[data-k=' + k + ']');
+  el.classList.add('has'); el.classList.remove('ready');
+  el.querySelector('.file span').textContent = f.name + ' · decoding…';
+  S.dec[k] = f.arrayBuffer().then(decode).then(b => {
+    S.buf[k] = b; S.peaks[k] = peaks(b, 800);
+    el.querySelector('.file span').textContent = f.name + ' · ' + mmss(b.duration) + ' · ' + (b.sampleRate / 1000).toFixed(1) + ' kHz';
+    el.classList.add('ready'); drawMini(k);
+    return b;
+  }).catch(() => { el.querySelector('.file span').textContent = f.name + ' · unreadable format, try WAV or MP3'; throw new Error('Could not decode "' + f.name + '". Try WAV or MP3.'); });
+  S.dec[k].catch(() => {});
+  $('#go').disabled = !(S.files.ref && S.files.mine);
+}
+function progress(p, label) {
+  const el = $('#prog'); el.classList.add('on');
+  el.querySelector('i').style.width = Math.round(p * 100) + '%';
+  el.querySelector('span').textContent = label;
+}
+const chans = b => b.numberOfChannels > 1 ? [b.getChannelData(0), b.getChannelData(1)] : [b.getChannelData(0)];
+
+$('#go').addEventListener('click', async () => {
+  $('#err').textContent = '';
+  $('#go').disabled = true; document.body.classList.add('busy');
+  stop(); audioCtx();
+  try {
+    for (const [k, a, b, lbl] of [['ref', 0, 0.5, 'A · Reference'], ['mine', 0.5, 1, 'B · My track']]) {
+      progress(a, lbl + ' — decoding…');
+      const buf = await S.dec[k];
+      S.res[k] = await Engine.analyze(chans(buf), buf.sampleRate, (p, l) => progress(a + (b - a) * p, lbl + ' — analysing ' + l + '…'));
+    }
+    S.cmp = Engine.compare(S.res.ref, S.res.mine);
+    progress(1, 'Analysis complete');
+    render();
+    setTimeout(() => $('#prog').classList.remove('on'), 1200);
+  } catch (e) {
+    console.error(e);
+    $('#err').textContent = e.message || String(e);
+    $('#prog').classList.remove('on');
+  }
+  document.body.classList.remove('busy');
+  $('#go').disabled = !(S.files.ref && S.files.mine);
+});
+$('#again').addEventListener('click', () => { stop(); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+
+// ---------- render
+function render() {
+  $('#results').classList.add('on');
+  resetMatch();
+  renderFaceoff(); renderRecs(); renderFaders(); renderTiles(); renderTable();
+  buildEqNodes(); renderBands(); initPlayer();
+  requestAnimationFrame(() => { drawAll(); $('#results').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+}
+
+function gaugeSvg(score) {
+  const cx = 100, cy = 100, r = 78, a0 = -135, a1 = 135;
+  const pt = (a, rr) => [cx + rr * Math.sin(a * Math.PI / 180), cy - rr * Math.cos(a * Math.PI / 180)];
+  const arc = (from, to, rr) => { const [x0, y0] = pt(from, rr), [x1, y1] = pt(to, rr); return `M${x0.toFixed(2)} ${y0.toFixed(2)} A${rr} ${rr} 0 ${to - from > 180 ? 1 : 0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`; };
+  let ticks = '';
+  for (let i = 0; i <= 40; i++) {
+    const a = a0 + (a1 - a0) * i / 40, big = i % 10 === 0;
+    const [x0, y0] = pt(a, 92), [x1, y1] = pt(a, big ? 84 : 88);
+    ticks += `<line x1="${x0.toFixed(1)}" y1="${y0.toFixed(1)}" x2="${x1.toFixed(1)}" y2="${y1.toFixed(1)}" stroke="${i / 40 <= score / 100 ? '#f2f3f7' : '#2e3240'}" stroke-width="${big ? 2 : 1}"/>`;
+  }
+  const end = a0 + (a1 - a0) * Math.max(0.005, score / 100);
+  const [nx, ny] = pt(end, 78);
+  return `<defs><linearGradient id="gg" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#22e6c8"/><stop offset="1" stop-color="#ff7a2f"/></linearGradient></defs>
+    ${ticks}<path d="${arc(a0, a1, r)}" fill="none" stroke="#1b1e27" stroke-width="12" stroke-linecap="round"/>
+    <path d="${arc(a0, end, r)}" fill="none" stroke="url(#gg)" stroke-width="12" stroke-linecap="round" style="filter:drop-shadow(0 0 8px rgba(255,255,255,.25))"/>
+    <circle cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="7" fill="#f2f3f7" stroke="#050507" stroke-width="3"/>`;
+}
+function renderFaceoff() {
+  const r = S.res.ref, m = S.res.mine, c = S.cmp;
+  $('#nmA').textContent = S.files.ref.name; $('#nmB').textContent = S.files.mine.name;
+  $('#abA').textContent = S.files.ref.name; $('#abB').textContent = S.files.mine.name;
+  $('#lufsA').textContent = fmt(r.I); $('#lufsB').textContent = fmt(m.I);
+  const chips = o => [`TP <b>${fmt(o.truePeak)}</b> dBTP`, `PLR <b>${fmt(o.PLR)}</b> dB`, `Width <b>${o.mono ? 'mono' : fmt(o.width) + ' dB'}</b>`, `<b>${o.key.en}</b> · ${o.key.camelot}`, o.bpm ? `<b>${fmt(o.bpm)}</b> BPM` : ''].filter(Boolean).map(x => `<span>${x}</span>`).join('');
+  $('#chA').innerHTML = chips(r); $('#chB').innerHTML = chips(m);
+  $('#scoreLbl').textContent = c.scoreLabel;
+  const dI = m.I - r.I, dc = $('#deltaChip');
+  dc.textContent = 'Δ LOUDNESS ' + sgn(dI) + ' LU';
+  dc.style.color = Math.abs(dI) <= 1 ? 'var(--ok)' : Math.abs(dI) <= 3 ? 'var(--mid)' : 'var(--hi)';
+  dc.style.borderColor = dc.style.color;
+  const t0 = performance.now(), dur = reduced ? 1 : 1100;
+  const step = now => {
+    const u = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - u, 3), v = Math.round(c.score * e);
+    $('#gaugeSvg').innerHTML = gaugeSvg(v); $('#scoreVal').textContent = v;
+    if (u < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+function renderRecs() {
+  $('#recs').innerHTML = S.cmp.recs.map((x, i) => `<div class="rec ${x.level}"><div class="n">${String(i + 1).padStart(2, '0')}</div><div class="hd"><span class="pill">${x.pill}</span><h4>${esc(x.title)}</h4></div><p>${esc(x.text)}</p></div>`).join('');
+}
+function renderFaders() {
+  const c = S.cmp, R = 9, H = 1;
+  $('#faders').innerHTML = c.zoneStats.map(z => {
+    const zone = c.ZONES.find(q => q.name === z.name);
+    const v = -z.mean, vc = Math.max(-R, Math.min(R, v)), a = Math.abs(v);
+    const col = a <= 1 ? 'var(--ok)' : a <= 3 ? 'var(--mid)' : 'var(--b)';
+    const pos = 50 - vc / R * 40, tgtTop = 50 - H / R * 40, tgtH = 2 * H / R * 40;
+    const fillTop = Math.min(50, pos), fillH = Math.abs(pos - 50);
+    let ticks = ''; for (let d = -R; d <= R; d += 3) ticks += `<i class="tick" style="top:${50 - d / R * 40}%"></i>`;
+    const act = a <= 1 ? '✓ on target' : v < 0 ? '↑ boost' : '↓ cut';
+    return `<div class="fader" style="--fc:${col}"><div class="ftrack">${ticks}<div class="tgt" style="top:${tgtTop}%;height:${tgtH}%"></div><div class="ctr"></div>
+      <div class="fill" style="top:${fillTop}%;height:${fillH}%"></div><div class="knob" style="top:${pos}%">${sgn(v)}</div></div>
+      <div class="fn">${z.name}</div><div class="fr">${fmtF(zone.lo)}–${fmtF(zone.hi)}</div><div class="fa" style="color:${col}">${act}</div></div>`;
+  }).join('');
+}
+function renderTiles() {
+  const r = S.res.ref, m = S.res.mine;
+  const T = [
+    { k: 'I', l: 'Integrated LUFS', u: '', min: -30, max: 0, du: ' LU' },
+    { k: 'Smax', l: 'Short-term max', u: '', min: -30, max: 0, du: ' LU' },
+    { k: 'truePeak', l: 'True peak (dBTP)', u: '', min: -12, max: 2, du: ' dB' },
+    { k: 'PLR', l: 'PLR · punch', u: ' dB', min: 0, max: 20, du: ' dB' },
+    { k: 'LRA', l: 'LRA · range', u: ' LU', min: 0, max: 20, du: ' LU' },
+    { k: 'rms', l: 'RMS (dBFS)', u: '', min: -30, max: 0, du: ' dB' },
+    { k: 'corr', l: 'Stereo correlation', u: '', min: -1, max: 1, d: 2 },
+    { k: 'width', l: 'Width (sides/mid)', u: ' dB', min: -40, max: 0, du: ' dB', st: true },
+    { k: 'widthLow', l: 'Width < 120 Hz', u: ' dB', min: -60, max: 0, du: ' dB', st: true },
+    { k: 'centroid', l: 'Spectral centroid', fv: fmtF, min: Math.log(200), max: Math.log(8000), map: Math.log }
+  ];
+  const pct = (t, v) => Math.max(2, Math.min(100, ((t.map ? t.map(v) : v) - t.min) / (t.max - t.min) * 100));
+  const val = (t, o) => t.st && o.mono ? 'mono' : t.fv ? t.fv(o[t.k]) : fmt(o[t.k], t.d || 1) + (t.u || '');
+  let html = T.map(t => {
+    const d = m[t.k] - r[t.k];
+    const dtxt = t.fv ? '' : (t.st && (r.mono || m.mono)) ? '' : `<span class="td">${sgn(d, t.d || 1)}${t.du || ''}</span>`;
+    return `<div class="tile"><div class="th"><span class="tl">${t.l}</span>${dtxt}</div>
+      <div class="tr a"><b>A</b><div class="tb"><i style="width:${pct(t, r[t.k])}%"></i></div><span class="tv">${val(t, r)}</span></div>
+      <div class="tr b"><b>B</b><div class="tb"><i style="width:${pct(t, m[t.k])}%"></i></div><span class="tv">${val(t, m)}</span></div></div>`;
+  }).join('');
+  html += `<div class="tile"><div class="th"><span class="tl">Key · Camelot</span><span class="td">${S.cmp.camCompat}</span></div>
+    <div class="tr a"><b>A</b><span style="font:600 14px var(--sans)">${r.key.fr}</span><span class="tv">${r.key.camelot}</span></div>
+    <div class="tr b"><b>B</b><span style="font:600 14px var(--sans)">${m.key.fr}</span><span class="tv">${m.key.camelot}</span></div></div>`;
+  html += `<div class="tile"><div class="th"><span class="tl">BPM (estimated)</span>${r.bpm && m.bpm ? `<span class="td">${sgn(m.bpm - r.bpm)}</span>` : ''}</div>
+    <div class="tr a"><b>A</b><div class="tb"><i style="width:${r.bpm ? Math.min(100, (r.bpm - 60) / 140 * 100) : 0}%"></i></div><span class="tv">${r.bpm ? fmt(r.bpm) : '—'}</span></div>
+    <div class="tr b"><b>B</b><div class="tb"><i style="width:${m.bpm ? Math.min(100, (m.bpm - 60) / 140 * 100) : 0}%"></i></div><span class="tv">${m.bpm ? fmt(m.bpm) : '—'}</span></div></div>`;
+  $('#tiles').innerHTML = html;
+}
+function renderTable() {
+  const r = S.res.ref, m = S.res.mine, c = S.cmp;
+  const row = (label, a, b, d, unit = '') => `<tr><td>${label}</td><td class="r">${a}</td><td class="m">${b}</td><td>${d === null || d === undefined || !isFinite(d) ? '—' : sgn(d) + unit}</td></tr>`;
+  const f1 = x => isFinite(x) ? fmt(x) : '—';
+  const wt = (o, v) => o.mono ? 'mono' : fmt(v) + ' dB';
+  const nm = r.mono || m.mono;
+  $('#metrics').innerHTML = '<tr><th>METRIC</th><th>A · REF</th><th>B · MINE</th><th>B − A</th></tr>' + [
+    row('Integrated LUFS', f1(r.I), f1(m.I), m.I - r.I, ' LU'),
+    row('LUFS short-term max', f1(r.Smax), f1(m.Smax), m.Smax - r.Smax, ' LU'),
+    row('LUFS momentary max', f1(r.Mmax), f1(m.Mmax), m.Mmax - r.Mmax, ' LU'),
+    row('True peak (dBTP)', f1(r.truePeak), f1(m.truePeak), m.truePeak - r.truePeak, ' dB'),
+    row('Sample peak (dBFS)', f1(r.samplePeak), f1(m.samplePeak), m.samplePeak - r.samplePeak, ' dB'),
+    row('RMS (dBFS)', f1(r.rms), f1(m.rms), m.rms - r.rms, ' dB'),
+    row('PLR', f1(r.PLR) + ' dB', f1(m.PLR) + ' dB', m.PLR - r.PLR, ' dB'),
+    row('Crest factor', f1(r.crest) + ' dB', f1(m.crest) + ' dB', m.crest - r.crest, ' dB'),
+    row('LRA', f1(r.LRA) + ' LU', f1(m.LRA) + ' LU', m.LRA - r.LRA, ' LU'),
+    row('Stereo correlation', fmt(r.corr, 2), fmt(m.corr, 2), m.corr - r.corr),
+    row('Width (sides / mid)', wt(r, r.width), wt(m, m.width), nm ? null : m.width - r.width, ' dB'),
+    row('Width below 120 Hz', wt(r, r.widthLow), wt(m, m.widthLow), nm ? null : m.widthLow - r.widthLow, ' dB'),
+    row('Width 120 Hz – 2 kHz', wt(r, r.widthMid), wt(m, m.widthMid), nm ? null : m.widthMid - r.widthMid, ' dB'),
+    row('Width above 2 kHz', wt(r, r.widthHigh), wt(m, m.widthHigh), nm ? null : m.widthHigh - r.widthHigh, ' dB'),
+    row('Spectral centroid', fmtF(r.centroid), fmtF(m.centroid), null),
+    row('Key (estimated)', r.key.fr + ' · ' + r.key.en, m.key.fr + ' · ' + m.key.en, null),
+    row('Camelot', r.key.camelot, m.key.camelot + ' (' + c.camCompat + ')', null),
+    row('BPM (estimated)', r.bpm ? fmt(r.bpm) : '—', m.bpm ? fmt(m.bpm) : '—', r.bpm && m.bpm ? m.bpm - r.bpm : null),
+    row('Duration', mmss(r.duration), mmss(m.duration), null),
+    row('Sample rate', fmt(r.sr / 1000) + ' kHz', fmt(m.sr / 1000) + ' kHz', null)
+  ].join('');
+}
+const tName = t => t === 'peaking' ? 'Bell' : t === 'lowshelf' ? 'Low shelf' : 'High shelf';
+function knobSvg(gain) {
+  const cx = 37, cy = 37, r = 28, p = (a, rr) => [cx + rr * Math.sin(a * Math.PI / 180), cy - rr * Math.cos(a * Math.PI / 180)];
+  const arc = (f, t, rr) => { const a = Math.min(f, t), b = Math.max(f, t); const [x0, y0] = p(a, rr), [x1, y1] = p(b, rr); return `M${x0.toFixed(2)} ${y0.toFixed(2)} A${rr} ${rr} 0 ${b - a > 180 ? 1 : 0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`; };
+  const ang = Math.max(-1, Math.min(1, gain / 6)) * 135, col = gain > 0 ? COL.ref : COL.mine;
+  const [px, py] = p(ang, 15), [qx, qy] = p(ang, 6);
+  return `<svg viewBox="0 0 74 74"><path d="${arc(-135, 135, r)}" fill="none" stroke="#232633" stroke-width="5" stroke-linecap="round"/>
+    <path d="${arc(0, ang || 0.1, r)}" fill="none" stroke="${col}" stroke-width="5" stroke-linecap="round" style="filter:drop-shadow(0 0 4px ${col})"/>
+    <circle cx="${cx}" cy="${cy}" r="19" fill="#191b24" stroke="#2e3240"/><line x1="${qx.toFixed(1)}" y1="${qy.toFixed(1)}" x2="${px.toFixed(1)}" y2="${py.toFixed(1)}" stroke="#f2f3f7" stroke-width="2.5" stroke-linecap="round"/></svg>`;
+}
+function renderBands() {
+  const eq = S.cmp.eq;
+  $('#bands').innerHTML = eq.length ? eq.map((e, i) => `<div class="band"><span class="bn">${i + 1}</span><div class="bz">${e.zone}</div>${knobSvg(e.gain)}
+      <div class="bg" style="color:${e.gain > 0 ? 'var(--a)' : 'var(--b)'}">${sgn(e.gain)} dB</div><div class="bd">${tName(e.type)} · ${fmtF(e.f)}${e.type === 'peaking' ? ' · Q ' + fmt(e.q) : ''}</div></div>`).join('')
+    : '<div class="empty">No significant tonal gap (over 1 dB): your spectral balance is already close to the reference.</div>';
+  $('#tgEq').disabled = !eq.length;
+}
+
+// ---------- charts
+const FMIN = 20, FMAX = 20000, PAD = { l: 40, r: 12, t: 12, b: 22 };
+const xOf = (f, w) => PAD.l + Math.log10(f / FMIN) / Math.log10(FMAX / FMIN) * (w - PAD.l - PAD.r);
+const fOf = (x, w) => FMIN * Math.pow(FMAX / FMIN, (x - PAD.l) / (w - PAD.l - PAD.r));
+function freqGrid(g, w, h, yTop, yBot) {
+  g.lineWidth = 1; g.font = '10px JetBrains Mono, monospace'; g.textAlign = 'center';
+  [50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000].forEach(f => {
+    const x = Math.round(xOf(f, w)) + 0.5;
+    g.strokeStyle = '#1b1e27'; g.beginPath(); g.moveTo(x, yTop); g.lineTo(x, yBot); g.stroke();
+    g.fillStyle = '#6c7189'; g.fillText(f >= 1000 ? f / 1000 + 'k' : f, Math.min(x, w - PAD.r - 8), h - 6);
+  });
+}
+function yGrid(g, w, y, from, to, step, fmtL) {
+  g.textAlign = 'right'; g.font = '10px JetBrains Mono, monospace';
+  for (let v = from; v <= to; v += step) { const yy = Math.round(y(v)) + 0.5; g.strokeStyle = v === 0 && fmtL ? '#3a3f52' : '#1b1e27'; g.beginPath(); g.moveTo(PAD.l, yy); g.lineTo(w - PAD.r, yy); g.stroke(); g.fillStyle = '#6c7189'; g.fillText(fmtL ? fmtL(v) : v, PAD.l - 6, yy + 3); }
+}
+function crosshair(g, w, h) {
+  if (S.hoverX === null) return;
+  const x = Math.round(S.hoverX * (w - PAD.l - PAD.r) + PAD.l) + 0.5;
+  g.strokeStyle = 'rgba(242,243,247,.5)'; g.lineWidth = 1; g.setLineDash([3, 3]);
+  g.beginPath(); g.moveTo(x, PAD.t); g.lineTo(x, h - PAD.b); g.stroke(); g.setLineDash([]);
+}
+function drawSpec() {
+  const c = S.cmp, { g, w, h } = prep($('#cSpec'));
+  const all = c.refD.concat(c.mineD).filter(isFinite);
+  const ymax = Math.ceil(Math.max(...all) / 6) * 6 + 3, ymin = ymax - 51;
+  const y = v => PAD.t + (ymax - v) / (ymax - ymin) * (h - PAD.t - PAD.b);
+  freqGrid(g, w, h, PAD.t, h - PAD.b);
+  yGrid(g, w, y, ymin + 3, ymax - 3, 12);
+  const path = arr => { g.beginPath(); arr.forEach((v, i) => { const X = xOf(c.freqs[i], w), Y = y(Math.max(v, ymin)); i ? g.lineTo(X, Y) : g.moveTo(X, Y); }); };
+  path(c.refD); g.lineTo(xOf(c.freqs[c.freqs.length - 1], w), h - PAD.b); g.lineTo(xOf(c.freqs[0], w), h - PAD.b); g.closePath();
+  const gr = g.createLinearGradient(0, PAD.t, 0, h - PAD.b); gr.addColorStop(0, hexA(COL.ref, .38)); gr.addColorStop(1, hexA(COL.ref, .02));
+  g.fillStyle = gr; g.fill();
+  path(c.refD); g.strokeStyle = COL.ref; g.lineWidth = 1.5; g.stroke();
+  g.save(); g.shadowColor = COL.mine; g.shadowBlur = 10; path(c.mineD); g.strokeStyle = COL.mine; g.lineWidth = 2.5; g.stroke(); g.restore();
+  crosshair(g, w, h);
+}
+function drawDiff() {
+  const c = S.cmp, { g, w, h } = prep($('#cDiff'));
+  const lim = Math.max(9, Math.ceil(Math.max(...c.diffSm.map(Math.abs), ...c.eq.map(e => Math.abs(e.gain))) / 3) * 3 + 1);
+  const y = v => PAD.t + 14 + (lim - v) / (2 * lim) * (h - PAD.t - 14 - PAD.b);
+  c.ZONES.forEach((z, i) => {
+    const x0 = xOf(z.lo, w), x1 = xOf(Math.min(z.hi, FMAX), w);
+    if (i % 2) { g.fillStyle = 'rgba(255,255,255,.022)'; g.fillRect(x0, PAD.t, x1 - x0, h - PAD.t - PAD.b); }
+    g.fillStyle = '#5a5f75'; g.font = '10px Space Grotesk, sans-serif'; g.textAlign = 'center';
+    if (x1 - x0 > 34) g.fillText(z.name, (x0 + x1) / 2, PAD.t + 8);
+  });
+  freqGrid(g, w, h, PAD.t + 14, h - PAD.b);
+  const step = lim > 12 ? 6 : 3, top = Math.floor(lim / step) * step;
+  yGrid(g, w, y, -top, top, step, v => (v > 0 ? '+' : '') + v);
+  const y0 = y(0);
+  ['pos', 'neg'].forEach(side => {
+    g.beginPath(); g.moveTo(xOf(c.freqs[0], w), y0);
+    c.diffSm.forEach((v, i) => g.lineTo(xOf(c.freqs[i], w), y(side === 'pos' ? Math.max(v, 0) : Math.min(v, 0))));
+    g.lineTo(xOf(c.freqs[c.freqs.length - 1], w), y0); g.closePath();
+    g.fillStyle = side === 'pos' ? hexA(COL.ref, .3) : hexA(COL.mine, .3); g.fill();
+  });
+  g.beginPath(); c.diffSm.forEach((v, i) => { const X = xOf(c.freqs[i], w), Y = y(v); i ? g.lineTo(X, Y) : g.moveTo(X, Y); });
+  g.strokeStyle = '#e4e6ee'; g.lineWidth = 1.5; g.stroke();
+  crosshair(g, w, h);
+}
+function eqResponse(n) {
+  const fr = new Float32Array(n), tot = new Float32Array(n), mag = new Float32Array(n), ph = new Float32Array(n);
+  for (let i = 0; i < n; i++) fr[i] = FMIN * Math.pow(FMAX / FMIN, i / (n - 1));
+  P.eqNodes.forEach(f => { f.getFrequencyResponse(fr, mag, ph); for (let i = 0; i < n; i++) tot[i] += 20 * Math.log10(mag[i] || 1e-6); });
+  return { fr, tot };
+}
+function drawEq() {
+  const { g, w, h } = prep($('#cEq')), eq = S.cmp.eq;
+  const { fr, tot } = eqResponse(240);
+  const lim = Math.max(6, Math.ceil(Math.max(...Array.from(tot).map(Math.abs)) / 3) * 3 + 3);
+  const y = v => PAD.t + (lim - v) / (2 * lim) * (h - PAD.t - PAD.b);
+  freqGrid(g, w, h, PAD.t, h - PAD.b);
+  yGrid(g, w, y, -lim, lim, lim > 9 ? 6 : 3, v => (v > 0 ? '+' : '') + v);
+  const y0 = y(0);
+  g.beginPath(); g.moveTo(xOf(fr[0], w), y0);
+  for (let i = 0; i < fr.length; i++) g.lineTo(xOf(fr[i], w), y(tot[i]));
+  g.lineTo(xOf(fr[fr.length - 1], w), y0); g.closePath();
+  const gr = g.createLinearGradient(0, PAD.t, 0, h - PAD.b);
+  gr.addColorStop(0, hexA(COL.ref, .45)); gr.addColorStop(.5, hexA(COL.ref, .04)); gr.addColorStop(.5, hexA(COL.mine, .04)); gr.addColorStop(1, hexA(COL.mine, .45));
+  g.fillStyle = gr; g.fill();
+  g.save(); g.shadowColor = '#fff'; g.shadowBlur = 8; g.beginPath();
+  for (let i = 0; i < fr.length; i++) { const X = xOf(fr[i], w), Y = y(tot[i]); i ? g.lineTo(X, Y) : g.moveTo(X, Y); }
+  g.strokeStyle = '#f2f3f7'; g.lineWidth = 2.5; g.stroke(); g.restore();
+  eq.forEach((e, i) => {
+    let k = 0, bd = Infinity; fr.forEach((f, j) => { const d = Math.abs(Math.log(f / e.f)); if (d < bd) { bd = d; k = j; } });
+    const X = xOf(e.f, w), Y = y(tot[k]), col = e.gain > 0 ? COL.ref : COL.mine;
+    g.beginPath(); g.arc(X, Y, 11, 0, Math.PI * 2); g.fillStyle = col; g.fill(); g.strokeStyle = '#050507'; g.lineWidth = 3; g.stroke();
+    g.fillStyle = '#050507'; g.font = '700 11px JetBrains Mono, monospace'; g.textAlign = 'center'; g.fillText(i + 1, X, Y + 4);
+  });
+  if (!eq.length) { g.fillStyle = '#8a8fa3'; g.font = '14px Space Grotesk, sans-serif'; g.textAlign = 'center'; g.fillText('Flat curve: no correction needed', w / 2, h / 2 - 12); }
+}
+function drawTime() {
+  const { g, w, h } = prep($('#cTime')), r = S.res.ref, m = S.res.mine;
+  const T = Math.max(r.duration, m.duration);
+  const vals = r.timeline.concat(m.timeline).map(p => p[1]);
+  const ymax = Math.min(0, Math.ceil(Math.max(...vals) / 3) * 3 + 3), ymin = Math.max(-60, Math.floor(Math.min(...vals.filter(v => v > -59)) / 6) * 6 - 3);
+  const x = t => PAD.l + t / T * (w - PAD.l - PAD.r), y = v => PAD.t + (ymax - v) / (ymax - ymin) * (h - PAD.t - PAD.b);
+  g.font = '10px JetBrains Mono, monospace'; g.textAlign = 'right';
+  for (let v = ymax; v >= ymin; v -= 6) { const yy = Math.round(y(v)) + 0.5; g.strokeStyle = '#1b1e27'; g.beginPath(); g.moveTo(PAD.l, yy); g.lineTo(w - PAD.r, yy); g.stroke(); g.fillStyle = '#6c7189'; g.fillText(v, PAD.l - 6, yy + 3); }
+  g.textAlign = 'center';
+  const stepT = T > 300 ? 60 : T > 90 ? 30 : 10;
+  for (let t = 0; t <= T; t += stepT) { const xx = Math.round(x(t)) + 0.5; g.strokeStyle = '#1b1e27'; g.beginPath(); g.moveTo(xx, PAD.t); g.lineTo(xx, h - PAD.b); g.stroke(); g.fillStyle = '#6c7189'; g.fillText(mmss(t), xx, h - 6); }
+  const line = (tl, col, dash, fill) => {
+    g.beginPath(); tl.forEach((p, i) => { const X = x(p[0]), Y = y(Math.max(p[1], ymin)); i ? g.lineTo(X, Y) : g.moveTo(X, Y); });
+    if (fill && tl.length) { g.lineTo(x(tl[tl.length - 1][0]), h - PAD.b); g.lineTo(x(tl[0][0]), h - PAD.b); g.closePath(); const gr = g.createLinearGradient(0, PAD.t, 0, h - PAD.b); gr.addColorStop(0, hexA(col, .25)); gr.addColorStop(1, hexA(col, 0)); g.fillStyle = gr; g.fill(); g.beginPath(); tl.forEach((p, i) => { const X = x(p[0]), Y = y(Math.max(p[1], ymin)); i ? g.lineTo(X, Y) : g.moveTo(X, Y); }); }
+    g.strokeStyle = col; g.lineWidth = 2; g.setLineDash(dash); g.stroke(); g.setLineDash([]);
+  };
+  line(r.timeline, COL.ref, [], true);
+  line(m.timeline, COL.mine, [5, 4], false);
+  [[r.I, COL.ref], [m.I, COL.mine]].forEach(([v, col]) => { const yy = y(v); g.strokeStyle = hexA(col, .45); g.lineWidth = 1; g.beginPath(); g.moveTo(PAD.l, yy); g.lineTo(w - PAD.r, yy); g.stroke(); });
+}
+function drawAll() { if (!S.cmp) return; drawSpec(); drawDiff(); drawEq(); drawTime(); drawWave(); drawLive(); drawMeter(); }
+let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { drawAll(); drawMini('ref'); drawMini('mine'); }, 120); });
+['#cSpec', '#cDiff'].forEach(id => {
+  const cv = $(id);
+  const move = e => {
+    if (!S.cmp) return;
+    const rect = cv.getBoundingClientRect(), w = rect.width, xp = e.clientX - rect.left;
+    const fx = (xp - PAD.l) / (w - PAD.l - PAD.r);
+    if (fx < 0 || fx > 1) return;
+    S.hoverX = fx;
+    const f = fOf(xp, w), c = S.cmp;
+    let i = 0, bd = Infinity; c.freqs.forEach((ff, k) => { const d = Math.abs(Math.log(ff / f)); if (d < bd) { bd = d; i = k; } });
+    $('#readout').innerHTML = `<b style="color:#f2f3f7">${fmtF(c.freqs[i])}</b> · <span style="color:var(--a)">Ref ${fmt(c.refD[i])} dB</span> · <span style="color:var(--b)">Mine ${fmt(c.mineD[i])} dB</span> · Gap ${sgn(c.diffSm[i])} dB`;
+    drawSpec(); drawDiff();
+  };
+  cv.addEventListener('pointermove', move); cv.addEventListener('pointerdown', move);
+  cv.addEventListener('pointerleave', () => { S.hoverX = null; if (S.cmp) { drawSpec(); drawDiff(); } });
+});
+
+// ---------- deck: waveform, live analyzer, meters
+function drawWave() {
+  const cv = $('#cWave'), { g, w, h } = prep(cv), mid = h / 2;
+  const T = Math.max(S.buf.ref.duration, S.buf.mine.duration), x0 = 34, W = w - x0 - 12;
+  const play = Math.min(pos(), curBuf().duration) / T;
+  g.fillStyle = '#0b0c10'; g.fillRect(0, 0, x0 - 6, h);
+  g.font = '800 15px Syne, sans-serif'; g.textAlign = 'center';
+  g.fillStyle = P.which === 'ref' ? COL.ref : '#3a3f52'; g.fillText('A', (x0 - 6) / 2, mid / 2 + 6);
+  g.fillStyle = P.which !== 'ref' ? COL[P.which] : '#3a3f52'; g.fillText(P.which === 'match' ? 'B+' : 'B', (x0 - 6) / 2, mid + mid / 2 + 6);
+  const low = P.which === 'match' && S.peaks.match ? 'match' : 'mine';
+  ['ref', low].forEach(k => {
+    const p = S.peaks[k], d = S.buf[k].duration, span = d / T * W, n = Math.max(1, Math.floor(span / 3)), up = k === 'ref', active = P.which === k;
+    for (let i = 0; i < n; i++) {
+      const q = p[Math.floor(i / n * p.length)], x = x0 + i * 3, done = (x - x0) / W <= play;
+      const a1 = active ? (done ? 1 : .55) : .22, hh = (mid - 8) * q[0], rh = Math.min(mid - 8, (mid - 8) * q[1] * 1.5);
+      g.fillStyle = hexA(COL[k], a1 * .45); g.fillRect(x, up ? mid - 2 - hh : mid + 2, 2, hh);
+      g.fillStyle = hexA(COL[k], a1); g.fillRect(x, up ? mid - 2 - rh : mid + 2, 2, rh);
+    }
+  });
+  g.fillStyle = '#23262f'; g.fillRect(x0, mid - .5, W, 1);
+  const px = x0 + play * W;
+  g.save(); g.shadowColor = '#fff'; g.shadowBlur = 10; g.fillStyle = '#f2f3f7'; g.fillRect(px - 1, 4, 2, h - 8); g.restore();
+}
+$('#cWave').addEventListener('pointerdown', e => {
+  if (!S.cmp) return;
+  const rect = e.currentTarget.getBoundingClientRect(), x0 = 34, W = rect.width - x0 - 12;
+  const T = Math.max(S.buf.ref.duration, S.buf.mine.duration);
+  const t = Math.max(0, Math.min(1, (e.clientX - rect.left - x0) / W)) * T;
+  const was = P.playing; stop(false);
+  P.offset = Math.min(t, curBuf().duration - 0.1);
+  if (was) start(); else { drawWave(); updateTime(); }
+});
+const LIVE = { n: 64, peak: new Float32Array(64), data: null };
+function drawLive() {
+  const { g, w, h } = prep($('#cLive'));
+  const col = COL[P.which];
+  g.font = '700 10px JetBrains Mono, monospace'; g.textAlign = 'left'; g.fillStyle = '#5a5f75';
+  if (!P.playing || !P.an) {
+    // idle: both average fingerprints
+    const c = S.cmp, all = c.refD.concat(c.mineD).filter(isFinite), mx = Math.max(...all), mn = mx - 45;
+    const y = v => 14 + (mx - v) / (mx - mn) * (h - 30);
+    const x = f => 8 + Math.log10(f / FMIN) / 3 * (w - 16);
+    const low = P.which === 'match' && S.cmpMatch ? 'match' : 'mine';
+    [['ref', c.refD], [low, low === 'match' ? S.cmpMatch.mineD : c.mineD]].forEach(([k, arr]) => {
+      g.beginPath(); arr.forEach((v, i) => { const X = x(c.freqs[i]), Y = y(Math.max(v, mn)); i ? g.lineTo(X, Y) : g.moveTo(X, Y); });
+      g.lineTo(x(c.freqs[c.freqs.length - 1]), h); g.lineTo(x(c.freqs[0]), h); g.closePath();
+      g.fillStyle = hexA(COL[k], k === P.which ? .28 : .1); g.fill();
+      g.beginPath(); arr.forEach((v, i) => { const X = x(c.freqs[i]), Y = y(Math.max(v, mn)); i ? g.lineTo(X, Y) : g.moveTo(X, Y); });
+      g.strokeStyle = hexA(COL[k], k === P.which ? 1 : .4); g.lineWidth = 1.5; g.stroke();
+    });
+    g.fillStyle = '#5a5f75'; g.fillText('SPECTRAL FINGERPRINT · PRESS ▶ FOR THE LIVE ANALYSER', 10, 14);
+    return;
+  }
+  const an = P.an, N = an.frequencyBinCount, sr = S.ctx.sampleRate;
+  if (!LIVE.data || LIVE.data.length !== N) LIVE.data = new Float32Array(N);
+  an.getFloatFrequencyData(LIVE.data);
+  const n = LIVE.n, gap = 2, bw = (w - 16) / n;
+  for (let i = 0; i < n; i++) {
+    const f0 = 25 * Math.pow(18000 / 25, i / n), f1 = 25 * Math.pow(18000 / 25, (i + 1) / n);
+    let k0 = Math.floor(f0 / sr * 2 * N), k1 = Math.max(k0, Math.floor(f1 / sr * 2 * N)), mx = -140;
+    for (let k = k0; k <= k1 && k < N; k++) if (LIVE.data[k] > mx) mx = LIVE.data[k];
+    const fc = Math.sqrt(f0 * f1), v = mx + 3 * Math.log2(fc / 1000);
+    const u = Math.max(0, Math.min(1, (v + 95) / 80));
+    LIVE.peak[i] = Math.max(u, LIVE.peak[i] - 0.012);
+    const bh = u * (h - 26), x = 8 + i * bw;
+    const gr = g.createLinearGradient(0, h, 0, h - bh); gr.addColorStop(0, hexA(col, .25)); gr.addColorStop(1, col);
+    g.fillStyle = gr; g.fillRect(x, h - 4 - bh, bw - gap, bh);
+    g.fillStyle = '#f2f3f7'; g.fillRect(x, h - 4 - LIVE.peak[i] * (h - 26) - 2, bw - gap, 2);
+  }
+  g.fillStyle = col; g.fillText('LIVE ANALYSER · ' + (P.which === 'ref' ? 'A · REFERENCE' : P.which === 'match' ? 'B+ · MATCHED' : 'B · MY TRACK' + ($('#tgEq').checked ? ' + EQ' : '')), 10, 14);
+}
+const MET = { l: -90, r: -90, pl: -90, pr: -90, buf: null };
+function drawMeter() {
+  const { g, w, h } = prep($('#cMeter'));
+  const col = COL[P.which];
+  if (P.playing && P.anL) {
+    const n = P.anL.fftSize; if (!MET.buf || MET.buf.length !== n) MET.buf = new Float32Array(n);
+    [['l', P.anL], ['r', P.anR]].forEach(([k, an]) => {
+      an.getFloatTimeDomainData(MET.buf); let s = 0, pk = 0;
+      for (let i = 0; i < n; i++) { const v = MET.buf[i]; s += v * v; if (Math.abs(v) > pk) pk = Math.abs(v); }
+      const rms = 10 * Math.log10(s / n + 1e-12) + 3, pd = 20 * Math.log10(pk + 1e-9);
+      MET[k] = Math.max(rms, MET[k] - 1.2); MET['p' + k] = Math.max(pd, MET['p' + k] - 0.4);
+    });
+  } else { MET.l = MET.r = MET.pl = MET.pr = -90; }
+  const y = d => 16 + (1 - Math.max(0, Math.min(1, (d + 48) / 48))) * (h - 24);
+  [['l', 10], ['r', 30]].forEach(([k, x]) => {
+    g.fillStyle = '#14161d'; g.fillRect(x, 16, 14, h - 24);
+    const top = y(MET[k]);
+    const gr = g.createLinearGradient(0, h, 0, 16); gr.addColorStop(0, hexA(col, .6)); gr.addColorStop(.75, col); gr.addColorStop(.9, '#ffc542'); gr.addColorStop(1, '#ff4d5e');
+    g.fillStyle = gr; g.fillRect(x, top, 14, h - 8 - top);
+    g.fillStyle = '#f2f3f7'; g.fillRect(x, y(MET['p' + k]) - 1, 14, 2);
+  });
+  g.fillStyle = '#5a5f75'; g.font = '700 9px JetBrains Mono, monospace'; g.textAlign = 'center';
+  g.fillText('L', 17, 11); g.fillText('R', 37, 11);
+}
+
+// ---------- A/B player
+const P = { which: 'ref', playing: false, src: null, startedAt: 0, offset: 0, eqNodes: [], gain: null, raf: 0, an: null, anL: null, anR: null };
+function buildEqNodes() {
+  const ctx = audioCtx();
+  P.eqNodes = S.cmp.eq.map(e => { const f = ctx.createBiquadFilter(); f.type = e.type; f.frequency.value = e.f; f.gain.value = e.gain; f.Q.value = e.q; return f; });
+}
+function graph() {
+  if (P.an) return;
+  const ctx = audioCtx();
+  P.an = ctx.createAnalyser(); P.an.fftSize = 8192; P.an.smoothingTimeConstant = 0.72; P.an.connect(ctx.destination);
+  P.split = ctx.createChannelSplitter(2);
+  P.anL = ctx.createAnalyser(); P.anR = ctx.createAnalyser(); P.anL.fftSize = P.anR.fftSize = 2048;
+  P.split.connect(P.anL, 0); P.split.connect(P.anR, 1);
+}
+function initPlayer() { stop(); P.offset = 0; setWhich('ref', false); updateTime(); }
+const curBuf = () => S.buf[P.which];
+function trackGain(k) {
+  if (!$('#tgMatch').checked) return 1;
+  return Math.pow(10, (Math.min(S.res.ref.I, S.res.mine.I) - S.res[k].I) / 20);
+}
+function pos() { return P.playing ? P.offset + S.ctx.currentTime - P.startedAt : P.offset; }
+function start() {
+  const b = curBuf(); if (!b) return;
+  graph();
+  if (S.ctx.state === 'suspended') S.ctx.resume();
+  if (P.offset >= b.duration - 0.05) P.offset = 0;
+  const src = S.ctx.createBufferSource(); src.buffer = b;
+  const g = S.ctx.createGain(); g.gain.value = trackGain(P.which);
+  g.channelCount = 2; g.channelCountMode = 'explicit'; g.channelInterpretation = 'speakers';
+  let node = src;
+  P.eqNodes.forEach(f => f.disconnect());
+  if (P.which === 'mine' && $('#tgEq').checked && P.eqNodes.length) P.eqNodes.forEach(f => { node.connect(f); node = f; });
+  node.connect(g); g.connect(P.an); g.connect(P.split);
+  src.onended = () => { if (P.src === src) { P.playing = false; P.offset = 0; P.src = null; icons(); frame(); } };
+  src.start(0, P.offset);
+  P.src = src; P.gain = g; P.startedAt = S.ctx.currentTime; P.playing = true; icons();
+  cancelAnimationFrame(P.raf);
+  const loop = () => { frame(); if (P.playing) P.raf = requestAnimationFrame(loop); };
+  loop();
+}
+function frame() { updateTime(); drawWave(); drawLive(); drawMeter(); }
+function stop(keepPos) {
+  if (P.src) { const s = P.src; if (keepPos) P.offset = pos(); P.src = null; try { s.stop(); } catch (e) {} }
+  if (P.gain) { try { P.gain.disconnect(); } catch (e) {} P.gain = null; }
+  P.playing = false; icons();
+  if (S.cmp) frame();
+}
+function icons() { $('#icoPlay').style.display = P.playing ? 'none' : ''; $('#icoPause').style.display = P.playing ? '' : 'none'; }
+function setWhich(w, resume = true) {
+  const was = P.playing;
+  if (was) { P.offset = pos(); stop(false); }
+  P.which = w;
+  $$('.abswitch button').forEach(b => b.classList.toggle('on', b.dataset.w === w));
+  const b = curBuf(); if (b) P.offset = Math.min(P.offset, b.duration - 0.1);
+  if (was && resume) start(); else if (S.cmp) frame();
+}
+function updateTime() {
+  const b = curBuf(); if (!b) return;
+  $('#time').innerHTML = mmss(Math.min(pos(), b.duration)) + ' <small>/ ' + mmss(b.duration) + '</small>';
+}
+$('#play').addEventListener('click', () => { if (!S.cmp) return; P.playing ? stop(true) : start(); });
+$$('.abswitch button').forEach(b => b.addEventListener('click', () => setWhich(b.dataset.w)));
+$('#tgMatch').addEventListener('change', () => { if (P.gain) P.gain.gain.setTargetAtTime(trackGain(P.which), S.ctx.currentTime, 0.02); });
+$('#tgEq').addEventListener('change', () => {
+  if (P.which !== 'mine' && $('#tgEq').checked) setWhich('mine');
+  else if (P.playing) { P.offset = pos(); stop(false); start(); }
+  else frame();
+});
+document.addEventListener('keydown', e => {
+  if (!S.cmp || (e.target.tagName === 'INPUT' && e.target.type === 'file')) return;
+  if (e.code === 'Space') { e.preventDefault(); $('#play').click(); }
+  if (e.key === 'a' || e.key === 'A') setWhich('ref');
+  if (e.key === 'b' || e.key === 'B') setWhich('mine');
+  if ((e.key === 'm' || e.key === 'M') && S.buf.match) setWhich('match');
+});
+
+// ---------- copy
+function toast(t) { const el = $('#toast'); el.textContent = t; el.classList.add('on'); setTimeout(() => el.classList.remove('on'), 1600); }
+async function copy(text) {
+  try { await navigator.clipboard.writeText(text); toast('Copied to clipboard'); }
+  catch (e) { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); toast('Copied'); } catch (_) { toast('Copy not available here'); } ta.remove(); }
+}
+const eqText = () => S.cmp.eq.map((e, i) => `${i + 1}. ${e.zone} — ${tName(e.type)} ${fmtF(e.f)}  ${sgn(e.gain)} dB${e.type === 'peaking' ? '  Q ' + fmt(e.q) : ''}`).join('\n');
+$('#copyEq').addEventListener('click', () => copy(eqText() || 'No EQ settings suggested.'));
+$('#copyReport').addEventListener('click', () => {
+  const r = S.res.ref, m = S.res.mine, c = S.cmp;
+  copy([
+    'REFX — referencing report',
+    'A · Ref: ' + S.files.ref.name, 'B · Mine: ' + S.files.mine.name,
+    'Match score: ' + c.score + '/100 (' + c.scoreLabel + ')', '',
+    `Integrated LUFS: ${fmt(r.I)} / ${fmt(m.I)}`,
+    `True peak: ${fmt(r.truePeak)} / ${fmt(m.truePeak)} dBTP`,
+    `PLR: ${fmt(r.PLR)} / ${fmt(m.PLR)} dB · LRA: ${fmt(r.LRA)} / ${fmt(m.LRA)} LU`,
+    `Stereo width: ${fmt(r.width)} / ${fmt(m.width)} dB · Correlation: ${fmt(r.corr, 2)} / ${fmt(m.corr, 2)}`,
+    `Key: ${r.key.en} (${r.key.camelot}) / ${m.key.en} (${m.key.camelot})`,
+    `BPM: ${r.bpm ? fmt(r.bpm) : '—'} / ${m.bpm ? fmt(m.bpm) : '—'}`, '',
+    'ACTION PLAN', ...c.recs.map((x, i) => `${i + 1}. [${x.pill}] ${x.title}\n   ${x.text}`), '',
+    'SUGGESTED EQ', eqText() || '—',
+    ...(S.cmpMatch ? ['', 'AUTO-MATCH', 'Match score: ' + c.score + ' → ' + S.cmpMatch.score, ...S.match.info.steps,
+      `Result: ${fmt(S.res.match.I)} LUFS · ${fmt(S.res.match.truePeak)} dBTP · PLR ${fmt(S.res.match.PLR)} dB`] : [])
+  ].join('\n'));
+});
+
+
+// ---------- auto-match
+const segVal = id => $(id + ' button.on').dataset.v;
+$$('.seg').forEach(seg => seg.addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  seg.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+}));
+[['#mEq', '#vEq'], ['#mW', '#vW']].forEach(([i, v]) => {
+  const el = $(i), upd = () => { $(v).textContent = el.value + '%'; el.style.setProperty('--p', el.value + '%'); };
+  el.addEventListener('input', upd); upd();
+});
+function mprog(p, label) {
+  const el = $('#mprog'); el.classList.add('on');
+  el.querySelector('i').style.width = Math.round(p * 100) + '%';
+  el.querySelector('span').textContent = label;
+}
+function resetMatch() {
+  S.match = null; S.buf.match = null; S.peaks.match = null; S.res.match = null; S.cmpMatch = null;
+  $('#mres').hidden = true; $('#abM').hidden = true; $('#mprog').classList.remove('on');
+  if (P.which === 'match') P.which = 'ref';
+  if (S.res.ref) $('#tRef').textContent = fmt(S.res.ref.I);
+}
+$('#goMatch').addEventListener('click', async () => {
+  if (!S.cmp) return;
+  const btn = $('#goMatch'); btn.disabled = true; document.body.classList.add('busy');
+  if (P.which === 'match') setWhich('mine', false);
+  stop(true);
+  $('#mwarn').textContent = '';
+  try {
+    const cv = segVal('#mCeil');
+    const o = { eq: +$('#mEq').value / 100, width: +$('#mW').value / 100, target: segVal('#mTarget'), ceiling: cv === 'ref' ? 'ref' : +cv, monoBass: $('#mMono').checked };
+    const out = await Matcher.process(S.buf.mine, S.res.ref, S.res.mine, S.cmp, o, (p, l) => mprog(p * 0.7, 'Processing — ' + l + '…'));
+    const ctx = audioCtx(), b = ctx.createBuffer(2, out.L.length, out.info.sr);
+    b.copyToChannel(out.L, 0); b.copyToChannel(out.R, 1);
+    S.match = out; S.buf.match = b; S.peaks.match = peaks(b, 800);
+    S.res.match = await Engine.analyze([out.L, out.R], out.info.sr, (p, l) => mprog(0.7 + 0.3 * p, 'Re-analysing the result — ' + l + '…'));
+    S.cmpMatch = Engine.compare(S.res.ref, S.res.match);
+    mprog(1, 'Done');
+    renderMatch();
+    setTimeout(() => $('#mprog').classList.remove('on'), 900);
+  } catch (e) {
+    console.error(e); $('#mwarn').textContent = 'Processing failed: ' + (e.message || e); $('#mres').hidden = false;
+  }
+  btn.disabled = false; document.body.classList.remove('busy');
+});
+function renderMatch() {
+  const r = S.res.ref, m = S.res.mine, x = S.res.match, info = S.match.info;
+  $('#mres').hidden = false; $('#abM').hidden = false;
+  $('#sBefore').textContent = S.cmp.score; $('#sAfter').textContent = S.cmpMatch.score;
+  const card = (k, b0, b1, ref) => `<div><div class="k">${k}</div><div class="v"><span class="b0">${b0}</span> → <span class="b1">${b1}</span></div><div class="r">ref ${ref}</div></div>`;
+  const w = o => o.mono ? 'mono' : fmt(o.width);
+  $('#ba').innerHTML = [
+    card('LUFS', fmt(m.I), fmt(x.I), fmt(r.I)),
+    card('True peak', fmt(m.truePeak), fmt(x.truePeak), fmt(r.truePeak)),
+    card('PLR · punch', fmt(m.PLR), fmt(x.PLR), fmt(r.PLR)),
+    card('Tonal gap', fmt(S.cmp.tonalRms) + ' dB', fmt(S.cmpMatch.tonalRms) + ' dB', '0'),
+    card('Width (dB)', w(m), w(x), w(r)),
+    card('Low-end width', m.mono ? 'mono' : fmt(m.widthLow), fmt(x.widthLow), r.mono ? 'mono' : fmt(r.widthLow))
+  ].join('');
+  $('#chain').innerHTML = info.steps.map(esc).join('<br>');
+  const warns = [];
+  if (info.maxGR > 6) warns.push(`Heavy limiting (up to ${fmt(info.maxGR)} dB of gain reduction). For a more transparent result, add density in the mix itself (bus compression, a clipper) and run the match again.`);
+  if (Math.abs(info.I - info.target) > 0.3) warns.push(`Target only partly reached (${fmt(info.I)} vs ${fmt(info.target)} LUFS) without going over the ceiling.`);
+  $('#mwarn').innerHTML = warns.map(esc).join('<br>');
+  setWhich('match', false);
+}
+$('#listenMatch').addEventListener('click', () => {
+  setWhich('match');
+  if (!P.playing) start();
+  $('.deck').scrollIntoView({ behavior: 'smooth', block: 'center' });
+});
+let DL = null;
+(async () => { try { if (window.claude && window.claude.use) DL = await window.claude.use('downloads'); } catch (e) { DL = null; } })();
+$('#dlMatch').addEventListener('click', async () => {
+  if (!S.match) return;
+  const note = $('#dlNote');
+  if (!DL) { note.textContent = 'Downloading isn\'t available in this view. Open REFX from claude.ai to save the file.'; return; }
+  const bits = +segVal('#mBits'), base = S.files.mine.name.replace(/\.[^.]+$/, '').replace(/[^\w\- ]+/g, '').trim() || 'track';
+  const btn = $('#dlMatch'); btn.disabled = true; note.textContent = 'Encoding WAV…';
+  await new Promise(r => setTimeout(r, 30));
+  try {
+    const wavName = base + '_REFX-match_' + bits + 'bit.wav';
+    const blob = Matcher.zip(wavName, Matcher.wav(S.match.L, S.match.R, S.match.info.sr, bits));
+    note.textContent = 'Waiting for your confirmation…';
+    await DL.save({ filename: base + '_REFX-match.zip', data: blob });
+    note.textContent = 'Saved: ' + wavName + ' (inside the zip).';
+  } catch (e) {
+    const c = e && e.code;
+    note.textContent = c === 'declined' ? 'Download cancelled.' : c === 'rate_limited' ? 'A download prompt is already open — try again in a moment.' : c === 'too_large' ? 'File too large here — try 16-bit.' : 'Download unavailable in this view (' + (c || 'error') + ').';
+  }
+  btn.disabled = false;
+});
+
+</script>
+</body>
+</html>
